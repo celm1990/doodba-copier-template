@@ -15,12 +15,20 @@ services:
         ODOO_VERSION: "{{ macros.version_minor(odoo_version) }}"
         UID: "${UID:-1000}"
         GID: "${GID:-1000}"
+        GIT_TOKEN: "${GIT_TOKEN}"
     environment:
       EMAIL_FROM: "{{ smtp_default_from|default("", true) }}"
       PGDATABASE: &dbname {{ postgres_dbname }}
       PGUSER: &dbuser "{{ postgres_username }}"
       PROXY_MODE: "{% if odoo_proxy %}true{% else %}false{% endif %}"
       LIST_DB: "{{ odoo_listdb | tojson }}"
+      DB_NAME: "${DB_NAME-{{ odoo_db_name }}}"
+      DB_MAXCONN: "${DB_MAXCONN-{{ odoo_db_maxconn }}}"
+      WORKERS: "${WORKERS-{{ workers }}}"
+      MAX_CRON_THREADS: "${MAX_CRON_THREADS-{{ max_cron_threads }}}"
+      LIMIT_MEMORY_HARD: "${LIMIT_MEMORY_HARD-{{ limit_memory_hard }}}"
+      LIMIT_MEMORY_SOFT: "${LIMIT_MEMORY_SOFT-{{ limit_memory_soft }}}"
+      SERVER_WIDE_MODULES: "${SERVER_WIDE_MODULES-{{ server_wide_modules }}}"
     tty: true
     volumes:
       - filestore:/var/lib/odoo:z

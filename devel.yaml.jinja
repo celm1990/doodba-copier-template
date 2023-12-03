@@ -45,6 +45,8 @@ services:
       LIST_DB: "true"
       DEBUGPY_ENABLE: "${DOODBA_DEBUGPY_ENABLE:-0}"
       PGDATABASE: &dbname devel
+      DB_FILTER: *dbname
+      DB_NAME: *dbname
       PYTHONDONTWRITEBYTECODE: 1
       PYTHONOPTIMIZE: ""
       PYTHONPATH: /opt/odoo/custom/src/odoo
@@ -70,6 +72,7 @@ services:
       {%- endif %}
       - --limit-time-real=9999999
       - --workers=0
+      - --max-cron-threads=0
       {%- if odoo_version == 9 %}
       - --dev
       {%- elif odoo_version >= 10 %}

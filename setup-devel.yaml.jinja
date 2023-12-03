@@ -37,6 +37,7 @@ services:
       UID: "${DOODBA_GITAGGREGATE_UID:-1000}"
       GID: "${DOODBA_GITAGGREGATE_GID:-1000}"
       UMASK: "$DOODBA_UMASK"
+      GIT_TOKEN: "${GIT_TOKEN}"
     user: root
     entrypoint: autoaggregate
 

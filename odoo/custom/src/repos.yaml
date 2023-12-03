@@ -6,11 +6,17 @@
     # for a sane value of 100 commits)
     depth: $DEPTH_DEFAULT
   remotes:
-    ocb: https://github.com/OCA/OCB.git
-    odoo: https://github.com/odoo/odoo.git
-    openupgrade: https://github.com/OCA/OpenUpgrade.git
-  target: ocb $ODOO_VERSION
+    origin: https://github.com/odoo/odoo.git
+  target: origin $ODOO_VERSION
   merges:
-    - ocb $ODOO_VERSION
+    - origin $ODOO_VERSION
     # Example of a merge of the PR with the number <PR>
     # - oca refs/pull/<PR>/head
+./enterprise:
+  defaults:
+    depth: $DEPTH_DEFAULT
+  remotes:
+    origin: https://$GIT_TOKEN@github.com/odoo/enterprise.git
+  target: origin $ODOO_VERSION
+  merges:
+    - origin $ODOO_VERSION

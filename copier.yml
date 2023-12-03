@@ -126,7 +126,7 @@ odoo_proxy:
     Which proxy will you use to deploy odoo?
 
 odoo_initial_lang:
-  default: en_US
+  default: es_EC
   type: str
   help: >-
     If you want to initialize Odoo automatically in a specific language, write it here.
@@ -136,7 +136,7 @@ odoo_initial_lang:
 
 odoo_admin_password:
   secret: true
-  default: example-admin-password
+  default: odoo
   type: str
   help: >-
     💡 To auto-generate strong passwords, see https://ddg.gg/?q=password+64+strong
@@ -188,7 +188,7 @@ project_license:
     find other propietary licenses we support in this scaffolding. Make a wise choice!
 
     So, what's your project's license?
-  default: BSL-1.0
+  default: LGPL-3.0-or-later
   choices:
     No license: no_license
     Apache License 2.0: Apache-2.0
@@ -214,7 +214,7 @@ gitlab_url:
 domains_prod:
   type: yaml
   multiline: true
-  default: {}
+  default: [{"hosts": ["example.com"]}]
   placeholder: |
     # Main domains, with TLS and cert resolved with "letsencrypt" resolver
     - hosts:
@@ -270,7 +270,7 @@ domains_prod:
 domains_test:
   type: yaml
   multiline: true
-  default: {}
+  default: [{"hosts": ["test.example.com"]}]
   placeholder: |
     # Main domains, with TLS and cert resolved with "letsencrypt" resolver
     - hosts:
@@ -387,7 +387,7 @@ postgres_dbname:
 
 postgres_password:
   secret: true
-  default: example-db-password
+  default: odoo
   type: str
   help: >-
     What will be your postgres user password?
@@ -416,12 +416,47 @@ postgres_cidr_whitelist:
     ⚠️ It must be a list. And this is only supported if you deploy with Traefik 2+.
 
 odoo_dbfilter:
-  default: "^{{ postgres_dbname }}"
+  default: "^%d"
   type: str
   help: >-
     Set your Odoo db filter. It must be a regexp that matches the domain name being
     visited. It is useful if you use Odoo in SaaS mode. Only applied to production
     environment.
+
+odoo_db_name:
+  type: str
+  default: "{{ postgres_dbname }}"
+  help: Nombre de BD de Odoo(dbname), pueden ser varias separadas por coma
+
+max_cron_threads:
+  default: 2
+  type: int
+  help: Cantidad de Crons disponibles?
+
+workers:
+  default: 4
+  type: int
+  help: Cantidad de Workers disponibles?
+
+limit_memory_hard:
+  default: 2684354560
+  type: int
+  help: Cantidad de Memoria RAM Disponible en Bytes(HARD)?
+
+limit_memory_soft:
+  default: 2147483648
+  type: int
+  help: Cantidad de Memoria RAM Disponible en Bytes(SOFT)?
+
+odoo_db_maxconn:
+  default: 100
+  type: int
+  help: Conexines Maximas a la  Base de datos desde Odoo?
+
+server_wide_modules:
+  default: base,web
+  type: str
+  help: Modulos a cargar al iniciar el server?
 
 smtp_default_from:
   type: str
