@@ -1,0 +1,33 @@
+{%- if enable_traefik_dashboard == true %}
+[http.routers]
+  [http.routers.dashboard]
+    rule = "Host(`{{ traefik_dashboard_domain }}`)"
+    service= "api@internal"
+    entryPoints = ["web"]
+    middlewares = ["redirectscheme-https", "forceSecure", "dashboard-auth"]
+  [http.routers.dashboard-secure]
+    rule = "Host(`{{ traefik_dashboard_domain }}`)"
+    service= "api@internal"
+    entryPoints = ["websecure"]
+    middlewares = ["redirectscheme-https", "forceSecure", "dashboard-auth"]
+  [http.routers.dashboard.tls]
+    certResolver = "letsencrypt"
+  [http.routers.dashboard-secure.tls]
+    certResolver = "letsencrypt"
+{%- endif %}
+
+[http.middlewares]
+  [http.middlewares.redirect-non-www-to-www.redirectRegex]
+    permanent = true
+    regex = "^https?://(?:www\\.)?(.+)"
+    replacement = "https://www.${1}"
+  [http.middlewares.redirectscheme-https.redirectScheme]
+    scheme = "https"
+    permanent = true
+  [http.middlewares.forceSecure.headers]
+    forceSTSHeader = true
+    sslRedirect = true
+  {%- if enable_traefik_dashboard == true %}
+  [http.middlewares.dashboard-auth.basicauth]
+    users = ["{{ traefik_dashboard_user }}:{{ traefik_dashboard_password }}"]
+  {%- endif %}
