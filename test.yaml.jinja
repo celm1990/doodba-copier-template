@@ -23,7 +23,9 @@ services:
     hostname: {{ macros.first_main_domain(domains_test)|tojson }}
     {%- endif %}
     depends_on:
+      {% if postgres_version -%}
       - db
+      {%- endif %}
       - smtp
     networks:
       default:
@@ -145,5 +147,7 @@ networks:
 
 volumes:
   filestore:
+  {% if postgres_version -%}
   db:
+  {%- endif %}
   smtpconf:

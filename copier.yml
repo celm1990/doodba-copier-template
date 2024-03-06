@@ -403,6 +403,12 @@ postgres_version:
     odoo_version <= 12.0 and postgres_version|int > 13 %}  The postgres version is too
     high for the selected Odoo version. {% endif %} {% endif %}
 
+pg_host:
+  type: str
+  default: "db"
+  help: >-
+    URL o IP para conectarse a postgres
+
 postgres_username:
   type: str
   default: odoo
@@ -411,7 +417,7 @@ postgres_username:
 
 postgres_dbname:
   type: str
-  default: prod
+  default: "{{ project_name }}"
   help: >-
     💡 If database names differ among environments, operations like restoring a database
     from an alien environment will be harder to maintain, but can provide additional
@@ -448,6 +454,27 @@ postgres_cidr_whitelist:
     instance, set that here please.
 
     ⚠️ It must be a list. And this is only supported if you deploy with Traefik 2+.
+
+pg_tune_conf:
+  when: "{{ postgres_version }}"
+  type: str
+  multiline: true
+  default: |
+    CONF_EXTRA: |
+            max_connections = 100
+            shared_buffers = 768MB
+            effective_cache_size = 2304MB
+            maintenance_work_mem = 192MB
+            checkpoint_completion_target = 0.9
+            wal_buffers = 16MB
+            default_statistics_target = 100
+            random_page_cost = 1.1
+            effective_io_concurrency = 200
+            work_mem = 3932kB
+            min_wal_size = 2GB
+            max_wal_size = 8GB
+            max_locks_per_transaction = 200
+  help: Configuracion de PG Tune?
 
 odoo_dbfilter:
   default: "^%d"

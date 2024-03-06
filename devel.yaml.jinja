@@ -58,7 +58,9 @@ services:
       - ./odoo/custom:/opt/odoo/custom:ro,z
       - ./odoo/auto:/opt/odoo/auto:rw,z
     depends_on:
+      {% if postgres_version -%}
       - db
+      {%- endif %}
       {% for host in whitelisted_hosts -%}
       - proxy_{{ host|replace(".", "_") }}
       {% endfor -%}
@@ -95,9 +97,11 @@ services:
     ports:
       - "127.0.0.1:{{ macros.version_major(odoo_version) }}081:8081"
     environment:
-      DATABASE_URL: postgres://{{ postgres_username }}:odoopassword@db:5432/devel?sslmode=disable
+      DATABASE_URL: postgres://{{ postgres_username }}:odoopassword@{{ pg_host }}:5432/devel?sslmode=disable
+    {% if postgres_version -%}
     depends_on:
       - db
+    {%- endif %}
 
   smtp:
     extends:
@@ -135,4 +139,6 @@ networks:
 
 volumes:
   filestore:
+  {% if postgres_version -%}
   db:
+  {%- endif %}
