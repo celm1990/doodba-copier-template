@@ -2,10 +2,11 @@ name: test
 
 on:
   pull_request:
+    branches:
+      - main
   push:
     branches:
-      - devel
-      - stable
+      - main
   workflow_dispatch:
     inputs:
       pytest_addopts:
@@ -53,7 +54,7 @@ jobs:
       # Shared steps
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0Fetch all history for all tags and branches
+          fetch-depth: 0 # Fetch all history for all tags and branches
       - name: Install python
         uses: actions/setup-python@v4
         with:
@@ -61,7 +62,7 @@ jobs:
       - name: Install Compose
         uses: ndeloof/install-compose-action@c036dce35dc2a23597c03aa05f32347b2cfa0437
         with:
-          version: v2.20.3
+          version: v2.26.0
           legacy: false # force V2
       - name: Generate cache key CACHE
         run:
@@ -79,7 +80,7 @@ jobs:
       - run: pip install poetry
       - name: Patch $PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-      - run: poetry install
+      - run: poetry install --no-root
       # Precreate shared networks to avoid race conditions
       - run: docker network create inverseproxy_shared
       - run: docker network create globalwhitelist_shared
