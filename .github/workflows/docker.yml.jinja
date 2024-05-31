@@ -27,6 +27,7 @@ jobs:
           docker-compose --file prod.yaml --project-name odoo up -d --build --remove-orphans
           docker-compose --file prod.yaml --project-name odoo down
           docker image list
+          docker tag {{ odoo_oci_image }}:{{ odoo_version }} {{ odoo_oci_image }}:{{ "${{ github.ref_name }}" }}
           docker tag {{ odoo_oci_image }}:{{ odoo_version }} {{ odoo_oci_image }}:{{ "${{ github.ref_name }}" }}-{{ "${{ github.sha }}" }}
+          docker push {{ odoo_oci_image }}:{{ "${{ github.ref_name }}" }}
           docker push {{ odoo_oci_image }}:{{ "${{ github.ref_name }}" }}-{{ "${{ github.sha }}" }}
-          docker-compose --file prod.yaml --project-name odoo push odoo
