@@ -61,8 +61,20 @@ services:
     env_file:
       - .docker/db-creation.env
     environment:
+      {%- if postgres_open_port %}
+      WAN_AUTH_METHOD: "{{ wan_auth_method }}"
+      WAN_CONNECTION: "host"
+      WAN_DATABASES: |
+        {{ wan_databases }}
+      WAN_USERS: |
+        {{ wan_users }}
+      {%- endif %}
       {{ pg_tune_conf }}
     restart: unless-stopped
+    {%- if postgres_open_port %}
+    ports:
+      - {{ postgres_exposed_port }}:5432
+    {%- endif %}
     {%- if postgres_exposed %}
     networks:
       default:

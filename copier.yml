@@ -448,13 +448,49 @@ postgres_password:
 postgres_exposed:
   default: false
   type: bool
+  when: "{{ postgres_version }}"
   help: >-
     Do you want to expose database service?
+
+postgres_open_port:
+  default: false
+  type: bool
+  when: &db_exposed "{{ postgres_version and postgres_exposed and true }}"
+  help: >-
+    Do you want to Open Ports database service?
+
+wan_auth_method:
+  default: "md5"
+  choices:
+    "trust": "trust"
+    "reject": "reject"
+    "scram-sha-256": "scram-sha-256"
+    "md5": "md5"
+    "password": "password"
+  when: &db_open_port "{{ db_exposed and postgres_open_port and true }}"
+  help: >-
+    Indicate the auth method for connect to the database.
+
+wan_databases:
+  when: *db_open_port
+  type: str
+  multiline: true
+  default: |
+    ["all"]
+  help: DataBase names?
+
+wan_users:
+  when: *db_open_port
+  type: str
+  multiline: true
+  default: |
+    ["all"]
+  help: User names?
 
 postgres_exposed_port:
   default: 5432
   type: int
-  when: &db_exposed "{{ postgres_exposed and true }}"
+  when: "{{ postgres_exposed or not postgres_version }}"
   help: >-
     Indicate the port to connect to the database.
 
