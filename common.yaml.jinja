@@ -4,7 +4,7 @@ version: "2.4"
 services:
   odoo:
     {%- if odoo_oci_image %}
-    image: {{ odoo_oci_image }}:{{ macros.version_minor(odoo_version) }}
+    image: {{ odoo_oci_image }}:{{ project_name }}-{{ macros.version_minor(odoo_version) }}
     {%- endif %}
     build:
       context: ./odoo

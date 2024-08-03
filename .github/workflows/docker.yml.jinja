@@ -23,11 +23,11 @@ jobs:
         env:
           GIT_TOKEN: {{ "${{ secrets.GIT_TOKEN }}" }}
         run: |
-          docker-compose --file ./inverseproxy/traefik.yaml --project-name inverseproxy up -d --remove-orphans
-          docker-compose --file prod.yaml --project-name odoo up -d --build --remove-orphans
-          docker-compose --file prod.yaml --project-name odoo down
+          docker compose --file ./inverseproxy/traefik.yaml --project-name inverseproxy up -d --remove-orphans
+          docker compose --file prod.yaml --project-name odoo up -d --build --remove-orphans
+          docker compose --file prod.yaml --project-name odoo down
           docker image list
-          docker tag {{ odoo_oci_image }}:{{ odoo_version }} {{ odoo_oci_image }}:{{ "${{ github.ref_name }}" }}
-          docker tag {{ odoo_oci_image }}:{{ odoo_version }} {{ odoo_oci_image }}:{{ "${{ github.ref_name }}" }}-{{ "${{ github.sha }}" }}
-          docker push {{ odoo_oci_image }}:{{ "${{ github.ref_name }}" }}
-          docker push {{ odoo_oci_image }}:{{ "${{ github.ref_name }}" }}-{{ "${{ github.sha }}" }}
+          docker tag {{ odoo_oci_image }}:{{ project_name }}-{{ odoo_version }} {{ odoo_oci_image }}:{{ project_name }}-{{ "${{ github.ref_name }}" }}
+          docker tag {{ odoo_oci_image }}:{{ project_name }}-{{ odoo_version }} {{ odoo_oci_image }}:{{ project_name }}-{{ "${{ github.ref_name }}" }}-{{ "${{ github.sha }}" }}
+          docker push {{ odoo_oci_image }}:{{ project_name }}-{{ "${{ github.ref_name }}" }}
+          docker push {{ odoo_oci_image }}:{{ project_name }}-{{ "${{ github.ref_name }}" }}-{{ "${{ github.sha }}" }}
