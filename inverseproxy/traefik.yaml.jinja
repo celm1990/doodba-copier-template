@@ -2,7 +2,7 @@ version: "2.4"
 
 services:
   proxy:
-    image: traefik:2.9
+    image: traefik:{% if traefik_version < 3 %}2.9{% else %}3.1.0{% endif %}
     container_name: "traefik"
     privileged: true
     tty: true
