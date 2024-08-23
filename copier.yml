@@ -266,8 +266,13 @@ traefik_dashboard_password:
   default: ""
   when: *enable_traefik_dashboard
   help: >-
-    Password to access into traefik dashboard Passwords must be hashed using MD5, SHA1,
-    or BCrypt. TIP: Use htpasswd to generate the passwords.
+    Password to access into traefik dashboard.
+
+    Passwords must be hashed using MD5, SHA1, or BCrypt.
+
+    TIP: Use htpasswd or https://bcrypt-generator.com/ to generate the passwords.
+
+    NOTE: Please ensure than the special characters are escaped(as $ must be $$).
 
 domains_prod:
   type: yaml

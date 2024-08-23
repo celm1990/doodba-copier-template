@@ -37,7 +37,23 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email={{ ssl_email }}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web-insecure"
-
+    {%- if enable_traefik_dashboard == true %}
+      - "--api.dashboard=true"
+    labels:
+      - traefik.enable=true
+      - traefik.http.middlewares.dashboard-wwwredirect.redirectregex.regex=^https://www\.(.*)
+      - traefik.http.middlewares.dashboard-wwwredirect.redirectregex.replacement=https://$${1}
+      - traefik.http.middlewares.dashboard-wwwredirect.redirectregex.permanent=true
+      - traefik.http.middlewares.dashboard-auth.basicauth.users={{ traefik_dashboard_user }}:{{ traefik_dashboard_password }}
+      - traefik.http.routers.dashboard.rule=Host(`{{ traefik_dashboard_domain }}`)
+      - traefik.http.routers.dashboard.service=api@internal
+      - traefik.http.routers.dashboard.entryPoints=web-insecure,web-main
+      - traefik.http.routers.dashboard.middlewares=dashboard-wwwredirect,dashboard-auth,
+      - traefik.http.routers.www-dashboard.rule=Host(`www.{{ traefik_dashboard_domain }}`)
+      - traefik.http.routers.www-dashboard.service=api@internal
+      - traefik.http.routers.www-dashboard.entrypoints=web-insecure,web-main
+      - traefik.http.routers.www-dashboard.middlewares=dashboard-wwwredirect
+    {%- endif %}
   dockersocket:
     image: tecnativa/docker-socket-proxy
     privileged: true
