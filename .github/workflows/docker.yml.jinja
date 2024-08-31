@@ -99,7 +99,7 @@ jobs:
               --omit '*/__openerp__.py,*/__manifest__.py,/opt/odoo/custom/src/*/*/__init__.py' \
               --data-file=/var/lib/odoo/coverage \
               --source $PATH_ADDONS_LIST \
-              -m odoo --stop-after-init --workers=0 --test-enable --init $ADDONS_LIST
+              /usr/local/bin/odoo --stop-after-init --workers=0 --test-enable --init $ADDONS_LIST
           docker compose --file prod.yaml --project-name odoo run --rm odoo \
             coverage report -m --data-file=/var/lib/odoo/coverage
           docker compose --file prod.yaml --project-name odoo run --rm odoo \
