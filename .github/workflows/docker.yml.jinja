@@ -1,7 +1,12 @@
 name: ci
 
 on:
+  pull_request:
+    branches:
+      - {{odoo_version}}
   push:
+    branches:
+      - {{odoo_version}}*
 
 jobs:
   pre-commit:
@@ -119,6 +124,7 @@ jobs:
           verbose: true
       - name: Push Image
         id: push
+        if: github.event_name == 'push'
         run: |
           docker image list
           docker tag {{ odoo_oci_image }}:{{ project_name }}-{{ odoo_version }} {{ odoo_oci_image }}:{{ project_name }}-{{ "${{ github.ref_name }}" }}
