@@ -105,18 +105,26 @@ jobs:
               --data-file=/var/lib/odoo/coverage \
               --source $PATH_ADDONS_LIST \
               /usr/local/bin/odoo --stop-after-init --workers=0 --test-enable --init $ADDONS_LIST
+      - name: Check if coverage file exists
+        id: check_coverage
+        if: {{ "${{ steps.list_private.outputs.PRIVATE_ADDONS_COUNT > 0 }}" }}
+        continue-on-error: true
+        run: |
+          coverage_report_ok=$(docker compose --file prod.yaml --project-name odoo run --rm odoo coverage report --format=total --data-file=/var/lib/odoo/coverage || true)
+          echo "COVERAGE_REPORT_OK=$coverage_report_ok"
+          echo "COVERAGE_REPORT_OK=$coverage_report_ok" >> "$GITHUB_OUTPUT"
+      - name: Copy coverage.xml to host
+        if: {{ "${{ steps.list_private.outputs.PRIVATE_ADDONS_COUNT > 0 && steps.check_coverage.outputs.COVERAGE_REPORT_OK != 'No data to report.'}}" }}
+        run: |
           docker compose --file prod.yaml --project-name odoo run --rm odoo \
             coverage report -m --data-file=/var/lib/odoo/coverage
           docker compose --file prod.yaml --project-name odoo run --rm odoo \
             coverage xml --data-file=/var/lib/odoo/coverage -o /var/lib/odoo/coverage.xml
-      - name: Copy coverage.xml to host
-        if: {{ "${{ steps.list_private.outputs.PRIVATE_ADDONS_COUNT > 0 }}" }}
-        run: |
           docker compose --file prod.yaml --project-name odoo run --name odoo -d --rm odoo tail -f /dev/null
           docker cp odoo:/var/lib/odoo/coverage.xml ./coverage.xml
           docker compose --file prod.yaml --project-name odoo down
       - uses: codecov/codecov-action@v3.1.6
-        if: {{ "${{ steps.list_private.outputs.PRIVATE_ADDONS_COUNT > 0 }}" }}
+        if: {{ "${{ steps.list_private.outputs.PRIVATE_ADDONS_COUNT > 0 && steps.check_coverage.outputs.COVERAGE_REPORT_OK != 'No data to report.'}}" }}
         with:
           token: {{ "${{ secrets.CODECOV_TOKEN }}" }}
           fail_ci_if_error: true # optional (default = false)
