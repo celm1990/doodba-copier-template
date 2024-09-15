@@ -3,11 +3,11 @@ name: ci
 on:
   pull_request:
     branches:
-      - {{odoo_version}}
+      - "{{odoo_version}}"
   push:
     branches:
-      - {{odoo_version}}
-      - {{odoo_version}}-test*
+      - "{{odoo_version}}"
+      - "{{odoo_version}}-test*"
 
 jobs:
   pre-commit:
