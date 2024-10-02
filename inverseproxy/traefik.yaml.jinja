@@ -31,7 +31,7 @@ services:
       - "--entrypoints.web-insecure.http.redirections.entryPoint.to=web-main"
       - "--entrypoints.web-insecure.http.redirections.entryPoint.scheme=https"
       - "--entrypoints.web-main.address=:443"
-      - "--entrypoints.web-main.transport.respondingTimeouts.idleTimeout=60s"
+      - "--entrypoints.web-main.transport.respondingTimeouts.readTimeout=3600s"
       - "--entrypoints.web-main.http.tls.certResolver=letsencrypt"
       - "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
       - "--certificatesresolvers.letsencrypt.acme.email={{ ssl_email }}"
