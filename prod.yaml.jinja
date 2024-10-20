@@ -101,10 +101,6 @@ services:
       {%- endif %}
       {{ pg_tune_conf }}
     restart: unless-stopped
-    {%- if postgres_open_port %}
-    ports:
-      - {{ postgres_exposed_port }}:5432
-    {%- endif %}
     {%- if postgres_exposed %}
     {%- if traefik_version == 3 %}
     networks:
@@ -120,7 +116,7 @@ services:
         postgres_exposed_port,
         project_name,
       ) }}
-    {%- else %}
+    {%- elif postgres_open_port %}
     ports:
       - "{{ postgres_exposed_port }}:5432"
     {%- endif %}
