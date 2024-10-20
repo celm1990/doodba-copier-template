@@ -21,7 +21,7 @@ services:
       - .docker/odoo.env
       - .docker/db-access.env
     environment:
-      DB_FILTER: "{{ odoo_dbfilter }}"
+      DB_FILTER: "{{ odoo_dbfilter | replace('$', '$$') }}"
       DOODBA_ENVIRONMENT: "${DOODBA_ENVIRONMENT-prod}"
       INITIAL_LANG: "{{ odoo_initial_lang }}"
       {%- if smtp_relay_host %}
@@ -106,19 +106,24 @@ services:
       - {{ postgres_exposed_port }}:5432
     {%- endif %}
     {%- if postgres_exposed %}
+    {%- if traefik_version == 3 %}
     networks:
       default:
       inverseproxy_shared:
     labels:
       traefik.enable: "true"
       traefik.docker.network: "inverseproxy_shared"
-      {{- traefik2_labels.database(
+      {{- traefik3_labels_2.database(
         domains_prod,
         postgres_cidr_whitelist,
         _key,
         postgres_exposed_port,
         project_name,
       ) }}
+    {%- else %}
+    ports:
+      - "{{ postgres_exposed_port }}:5432"
+    {%- endif %}
     {%- endif %}
   {%- endif %}
 

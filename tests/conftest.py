@@ -33,7 +33,7 @@ SELECTED_ODOO_VERSIONS = (
     frozenset(map(float, os.environ.get("SELECTED_ODOO_VERSIONS", "").split()))
     or ALL_ODOO_VERSIONS
 )
-PRERELEASE_ODOO_VERSIONS = {17.0}
+PRERELEASE_ODOO_VERSIONS = {18.0}
 
 # Postgres versions
 ALL_PSQL_VERSIONS = tuple(COPIER_SETTINGS["postgres_version"]["choices"])
@@ -64,6 +64,10 @@ DBVER_PER_ODOO = {
         "latest": LATEST_PSQL_VER,
     },
     17.0: {
+        "oldest": "12",
+        "latest": LATEST_PSQL_VER,
+    },
+    18.0: {
         "oldest": "12",
         "latest": LATEST_PSQL_VER,
     },
@@ -151,7 +155,7 @@ def traefik_host(request):
     docker = DockerClient()
     if request.param == "3":
         traefik_container = docker.run(
-            "traefik:v3.0",
+            "traefik:v3.1.2",
             detach=True,
             privileged=True,
             networks=["inverseproxy_shared"],
