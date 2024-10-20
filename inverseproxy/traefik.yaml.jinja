@@ -12,6 +12,9 @@ services:
     ports:
       - 80:80
       - 443:443
+    {%- if postgres_exposed and postgres_exposed_port and traefik_version == 3 %}
+      - "{{ postgres_exposed_port }}:5432"
+    {%- endif %}
     volumes:
       - acme:/etc/traefik/acme:rw,Z
     depends_on:
@@ -37,6 +40,9 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email={{ ssl_email }}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web-insecure"
+    {%- if postgres_exposed and postgres_exposed_port and traefik_version == 3 %}
+      - "--entrypoints.postgres-entrypoint.address=:{{ postgres_exposed_port }}"
+    {%- endif %}
     {%- if enable_traefik_dashboard == true %}
       - "--api.dashboard=true"
     labels:
