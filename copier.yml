@@ -102,7 +102,7 @@ _migrations:
 odoo_version:
   help: On which odoo version is it based?
   type: float
-  default: 17.0
+  default: 18.0
   choices:
     - 7.0
     - 8.0
@@ -115,6 +115,7 @@ odoo_version:
     - 15.0
     - 16.0
     - 17.0
+    - 18.0
 
 odoo_proxy:
   default: traefik
@@ -412,7 +413,7 @@ cidr_whitelist:
     ⚠️ It must be a list. And this is only supported if you deploy with Traefik 2+.
 
 postgres_version:
-  default: "15"
+  default: "16"
   help: >-
     Which PostgreSQL version do you want to deploy? (Recommended: for new instances
     always use the latest version. Version 9.6 has no backup support.)
@@ -425,6 +426,7 @@ postgres_version:
     "13": "13"
     "14": "14"
     "15": "15"
+    "16": "16"
   validator: >-
     {% if postgres_version|int > 0 %} {% if (odoo_version >= 16.0 and
     postgres_version|int < 12) or (odoo_version >= 14.0 and postgres_version|int < 10)
@@ -471,7 +473,9 @@ postgres_exposed:
 postgres_open_port:
   default: false
   type: bool
-  when: &db_exposed "{{ postgres_version and postgres_exposed and true }}"
+  when:
+    &db_exposed "{{ postgres_version and postgres_exposed and traefik_version != 3 and
+    true }}"
   help: >-
     Do you want to Open Ports database service?
 
@@ -506,7 +510,7 @@ wan_users:
 postgres_exposed_port:
   default: 5432
   type: int
-  when: "{{ postgres_exposed or not postgres_version }}"
+  when: "{{ (postgres_exposed and traefik_version != 3) or not postgres_version }}"
   help: >-
     Indicate the port to connect to the database.
 
