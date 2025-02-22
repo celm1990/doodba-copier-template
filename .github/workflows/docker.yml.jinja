@@ -134,7 +134,7 @@ jobs:
           verbose: true
       - name: Push Image
         id: push
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
           docker image list
           docker tag {{ odoo_oci_image }}:{{ project_name }}-{{ odoo_version }} {{ odoo_oci_image }}:{{ project_name }}-{{ "${{ github.ref_name }}" }}
