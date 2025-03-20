@@ -92,11 +92,10 @@ services:
     extends:
       file: common.yaml
       service: db
-    environment:
-      - DB_HOST={{ _key }}-db
     env_file:
       - .docker/db-creation.env
     environment:
+      DB_HOST: {{ _key }}-db
       {%- if postgres_open_port %}
       WAN_AUTH_METHOD: "{{ wan_auth_method }}"
       WAN_CONNECTION: "host"
