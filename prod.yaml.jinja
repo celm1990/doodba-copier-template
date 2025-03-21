@@ -30,6 +30,7 @@ services:
       {%- if smtp_relay_host %}
       SMTP_SERVER: smtplocal
       {%- endif %}
+      PGHOST: {{ _key }}-db
     {% if postgres_version or smtp_relay_host -%}
     depends_on:
     {% if postgres_version -%}
@@ -94,6 +95,7 @@ services:
     env_file:
       - .docker/db-creation.env
     environment:
+      DB_HOST: {{ _key }}-db
       {%- if postgres_open_port %}
       WAN_AUTH_METHOD: "{{ wan_auth_method }}"
       WAN_CONNECTION: "host"
@@ -104,10 +106,12 @@ services:
       {%- endif %}
       {{ pg_tune_conf }}
     restart: unless-stopped
-    {%- if postgres_exposed %}
-    {%- if traefik_version == 3 %}
     networks:
       default:
+        aliases:
+          - "{{ _key }}-db"
+    {%- if postgres_exposed %}
+    {%- if traefik_version >= 3 %}
       inverseproxy_shared:
     labels:
       traefik.enable: "true"
