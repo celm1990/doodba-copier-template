@@ -12,7 +12,7 @@ plumbum = "^1.8.2"
 python = "^3.8.1"
 
 [tool.poetry.dev-dependencies]
-black = "^23.10.1"
+black = "^24.8.0"
 flake8 = "^6.1.0"
 invoke = "^2.2.0"
 pylint = "^3.0.2"
@@ -21,7 +21,7 @@ pytest-xdist = "^3.3.1"
 packaging = "^23.1"
 requests = "^2.31.0"
 pre-commit = "^3.3.3"
-python-on-whales = "^0.64.2"
+python-on-whales = "^0.78.0"
 
 [tool.isort]
 # See https://github.com/psf/black
