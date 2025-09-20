@@ -21,7 +21,6 @@ services:
       PGDATABASE: &dbname {{ postgres_dbname }}
       PGUSER: &dbuser "{{ postgres_username }}"
       PROXY_MODE: "{% if odoo_proxy %}true{% else %}false{% endif %}"
-      LIST_DB: "{{ odoo_listdb | tojson }}"
       DB_NAME: "${DB_NAME-{{ odoo_db_name }}}"
       DB_MAXCONN: "${DB_MAXCONN-{{ odoo_db_maxconn }}}"
       WORKERS: "${WORKERS-{{ workers }}}"
