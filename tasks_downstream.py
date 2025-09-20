@@ -537,14 +537,14 @@ def lint(c, verbose=False):
 
 
 @task()
-def start(c, detach=True, debugpy=False):
+def start(c, detach=True, debugpy=False, _reload=True):
     """Start environment."""
     cmd = DOCKER_COMPOSE_CMD + " up"
     with tempfile.NamedTemporaryFile(
         mode="w",
         suffix=".yaml",
     ) as tmp_docker_compose_file:
-        if debugpy:
+        if debugpy or not _reload:
             # Remove auto-reload
             cmd = (
                 DOCKER_COMPOSE_CMD + " -f docker-compose.yml "
@@ -712,8 +712,9 @@ def updatepot(
         with open(new_file, "w") as fd:
             fd.write(content.strip() + "\n")
     _logger.info(".po[t] files updated")
-    precommit_cmd = f"pre-commit run --files {' '.join(iglob(f'{glob}/*.po*'))}"
-
+    precommit_cmd = (
+        f"pre-commit run --files {' '.join(iglob(f'{glob}/*.po*'))}" "--color=always"
+    )
     if not repo and module:
         for folder in iglob(f"{PROJECT_ROOT}/odoo/custom/src/*/*"):
             if os.path.isdir(folder) and os.path.basename(folder) == module:
@@ -1008,11 +1009,23 @@ def resetdb(
         )
         lang = os.getenv("INITIAL_LANG")
         lang_opt = f" --lang {lang}" if lang else ""
-        c.run(
-            f"{_run} click-odoo-initdb -n {dbname} -m {modules}{lang_opt}",
-            env=UID_ENV,
-            pty=True,
-        )
+        if ODOO_VERSION >= 19:
+            # Odoo 19: Registry.new(force_demo=...) removed → avoid click-odoo-initdb
+            # Use native Odoo CLI; --without-demo=all replaces force_demo=False
+            lang_opt19 = f" --load-language={lang}" if lang else ""
+            c.run(
+                f"{_run} odoo --stop-after-init -d {dbname} -i {modules}"
+                f"{lang_opt19} --without-demo=all",
+                env=UID_ENV,
+                pty=True,
+            )
+        else:
+            # Older versions keep using click-odoo-initdb
+            c.run(
+                f"{_run} click-odoo-initdb -n {dbname} -m {modules}{lang_opt}",
+                env=UID_ENV,
+                pty=True,
+            )
     if populate and ODOO_VERSION < 11:
         _logger.warn(
             f"Skipping populate task as it is not available in v{ODOO_VERSION}"
@@ -1195,3 +1208,52 @@ def restore_snapshot(
         )
         if "Stopping" in cur_state:
             c.run(f"{DOCKER_COMPOSE_CMD} start odoo db", pty=True)
+
+
+@task(
+    help={
+        "module_name": "Name of the module to scaffold.",
+        "path": "Path where to create the module. Default: current directory.",
+    },
+)
+def scaffold(
+    c,
+    module_name,
+    path=None,
+):
+    """Scaffold a new Odoo module.
+
+    Creates a new Odoo module with the basic structure using odoo scaffold command.
+    """
+    if not module_name:
+        raise exceptions.ParseError(
+            msg="Module name is required. See --help for details."
+        )
+
+    # Use current directory if no path specified, otherwise use the specified path
+    target_path = path or str(Path.cwd())
+
+    # Convert the target path to be relative to PROJECT_ROOT for the container
+    target_path_abs = Path(target_path).resolve()
+    if not target_path_abs.is_relative_to(PROJECT_ROOT):
+        raise exceptions.ParseError(
+            msg=f"Path '{target_path}' must be within the project directory."
+        )
+
+    # Convert to container path
+    container_path = str(target_path_abs.relative_to(PROJECT_ROOT))
+    if container_path == ".":
+        container_path = ""
+
+    cmd = (
+        f"{DOCKER_COMPOSE_CMD} run --rm -v "
+        f'"{PROJECT_ROOT}:/tmp/project:rw" '
+        f"odoo odoo scaffold {module_name} /tmp/project/{container_path}"
+    )
+
+    with c.cd(str(PROJECT_ROOT)):
+        c.run(
+            cmd,
+            env=UID_ENV,
+            pty=True,
+        )
