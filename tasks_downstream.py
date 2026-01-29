@@ -171,6 +171,22 @@ def _scan_subrepos_and_add_path_mappings(
                 chrome_configuration["pathMapping"][url] = path
 
 
+def _modules_installed(c, modules_list, dbname="devel"):
+    """Return set of module technical names installed in dbname."""
+    if not modules_list:
+        return set()
+    # Quote module names safely for SQL IN (...)
+    quoted = ",".join(repr(m) for m in modules_list if m)
+    cmd = (
+        f"{DOCKER_COMPOSE_CMD} exec -T db "
+        f"psql -U odoo -d {dbname} -Atc "
+        f'"select name from ir_module_module '
+        f"where state='installed' and name in ({quoted});\""
+    )
+    res = c.run(cmd, hide=True, warn=True)
+    return set(filter(None, res.stdout.splitlines()))
+
+
 @task
 def write_code_workspace_file(c, cw_path=None):
     """Generate code-workspace file definition.
@@ -912,7 +928,18 @@ def test(
         modules = _get_module_list(c, modules, core, extra, private, enterprise)
     odoo_command = ["odoo", "--test-enable", "--stop-after-init", "--workers=0"]
     if mode == "init":
-        odoo_command.append("-i")
+        if ODOO_VERSION >= 19:
+            mods = [m for m in modules.split(",") if m]
+            installed = _modules_installed(c, mods)
+            to_install = [m for m in mods if m not in installed]
+            to_update = sorted(installed)
+
+            if to_install:
+                odoo_command.extend(["-i", ",".join(to_install)])
+            if to_update:
+                odoo_command.extend(["-u", ",".join(to_update)])
+        else:
+            odoo_command.append("-i")
     elif mode == "update":
         odoo_command.append("-u")
     else:
@@ -931,7 +958,8 @@ def test(
             continue
         modules_list.remove(m_to_skip)
     modules = ",".join(modules_list)
-    odoo_command.append(modules)
+    if not (mode == "init" and ODOO_VERSION >= 19):
+        odoo_command.append(modules)
     if ODOO_VERSION >= 12:
         # Limit tests to explicit list
         # Filter spec format (comma-separated)

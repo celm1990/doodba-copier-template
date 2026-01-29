@@ -30,7 +30,7 @@ services:
       SERVER_WIDE_MODULES: "${SERVER_WIDE_MODULES-{{ server_wide_modules }}}"
     tty: true
     volumes:
-      - filestore:/var/lib/odoo:z
+      - filestore:/var/lib/odoo
     {%- if odoo_proxy == "traefik" %}
     labels:
       traefik.backend.buffering.retryExpression: IsNetworkError() && Attempts() < 5
@@ -49,7 +49,7 @@ services:
       CONF_EXTRA: |
         work_mem = 512MB
     volumes:
-      - db:/var/lib/postgresql/data:z
+      - db:/var/lib/postgresql/data
   {%- endif %}
 
   smtpfake:
@@ -61,11 +61,11 @@ services:
     hostname: "smtp.{{ smtp_canonical_default }}"
     stop_grace_period: 1m
     volumes:
-      - mailconfig:/tmp/docker-mailserver:z
-      - maildata:/var/mail:z
-      - maillogs:/var/log/mail:z
-      - maillogssupervisord:/var/log/supervisor:z
-      - mailstate:/var/mail-state:z
+      - mailconfig:/tmp/docker-mailserver
+      - maildata:/var/mail
+      - maillogs:/var/log/mail
+      - maillogssupervisord:/var/log/supervisor
+      - mailstate:/var/mail-state
     cap_add:
       - SYS_PTRACE
     environment:
@@ -118,6 +118,6 @@ services:
       {%- endif %}
       TZ: "{{ backup_tz }}"
     volumes:
-      - backup_cache:/root:z
-      - filestore:/mnt/backup/src/odoo:z
+      - backup_cache:/root
+      - filestore:/mnt/backup/src/odoo
   {%- endif %}

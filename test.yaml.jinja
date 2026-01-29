@@ -141,7 +141,7 @@ services:
       {%- endcall %}
       {%- endif %}
     volumes:
-      - "smtpconf:/etc/mailhog:ro,z"
+      - "smtpconf:/etc/mailhog:ro"
     entrypoint: [sh, -c]
     command:
       - test -r /etc/mailhog/auth && export MH_AUTH_FILE=/etc/mailhog/auth; exec MailHog
