@@ -1,5 +1,7 @@
+{% if compose_version == "v1" %}
 version: "2.4"
 
+{% endif %}
 services:
   proxy:
     image: traefik:{% if traefik_version < 3 %}2.9{% else %}3.2.0{% endif %}
