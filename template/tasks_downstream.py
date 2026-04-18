@@ -4,7 +4,9 @@ This file is to be executed with https://www.pyinvoke.org/ in Python 3.8.1+.
 
 Contains common helpers to develop using this child project.
 """
+
 import json
+import operator
 import os
 import shutil
 import stat
@@ -73,9 +75,10 @@ def _override_docker_command(service, command, file, orig_file=None):
     else:
         docker_compose_file_version = "2.4"
     docker_config = {
-        "version": docker_compose_file_version,
         "services": {service: {"command": command}},
     }
+    if not docker_compose_v2 and docker_compose_file_version:
+        docker_config["version"] = docker_compose_file_version
     docker_config_yaml = yaml.dump(docker_config)
     file.write(docker_config_yaml)
     file.flush()
@@ -109,7 +112,6 @@ def _get_cwd_addon(file):
 
 def _scan_subrepos_and_add_path_mappings(
     cw_config,
-    debugpy_configuration,
     firefox_configuration,
     chrome_configuration,
 ):
@@ -122,15 +124,6 @@ def _scan_subrepos_and_add_path_mappings(
                 {"path": str(subrepo.relative_to(PROJECT_ROOT))}
             )
 
-        # Check if subrepo is itself a doodba-copier project
-        is_doodba_subproject = False
-        answers_file = subrepo / ".copier-answers.yml"
-        if answers_file.is_file():
-            with answers_file.open() as f:
-                answers = yaml.safe_load(f) or {}
-            if "Tecnativa/doodba-copier-template" in answers.get("_src_path", ""):
-                is_doodba_subproject = True
-
         private_dir = subrepo / "odoo" / "custom" / "src" / "private"
         # Default scanning approach (1-level + addons/* + private/*)
         for addon in chain(
@@ -141,27 +134,6 @@ def _scan_subrepos_and_add_path_mappings(
             if (addon / "__manifest__.py").is_file() or (
                 addon / "__openerp__.py"
             ).is_file():
-                if is_doodba_subproject:
-                    local_path = "${workspaceFolder:%s}/odoo/custom/src/private/%s" % (  # noqa: UP031
-                        subrepo.name,
-                        addon.name,
-                    )
-                elif subrepo.name == "odoo":
-                    local_path = "${workspaceFolder:%s}/addons/%s/" % (  # noqa: UP031
-                        subrepo.name,
-                        addon.name,
-                    )
-                else:
-                    local_path = "${workspaceFolder:%s}/%s" % (  # noqa: UP031
-                        subrepo.name,
-                        addon.name,
-                    )
-                debugpy_configuration["pathMappings"].append(
-                    {
-                        "localRoot": local_path,
-                        "remoteRoot": f"/opt/odoo/auto/addons/{addon.name}/",
-                    }
-                )
                 url = f"http://localhost:{ODOO_VERSION:.0f}069/{addon.name}/static/"
                 path = "${workspaceFolder:%s}/%s/static/" % (  # noqa: UP031
                     subrepo.name,
@@ -225,13 +197,13 @@ def write_code_workspace_file(c, cw_path=None):
     cw_config.setdefault("settings", {})
     cw_config["settings"].update(
         {
-            "python.autoComplete.extraPaths": [f"{str(SRC_PATH)}/odoo"],
-            "python.analysis.extraPaths": [f"{str(SRC_PATH)}/odoo"],
+            "python.autoComplete.extraPaths": [f"{SRC_PATH}/odoo"],
+            "python.analysis.extraPaths": [f"{SRC_PATH}/odoo"],
             "python.formatting.provider": "none",
             "python.linting.flake8Enabled": True,
-            "python.linting.ignorePatterns": [f"{str(SRC_PATH)}/odoo/**/*.py"],
+            "python.linting.ignorePatterns": [f"{SRC_PATH}/odoo/**/*.py"],
             "python.linting.pylintArgs": [
-                f"--init-hook=\"import sys;sys.path.append('{str(SRC_PATH)}/odoo')\"",
+                f"--init-hook=\"import sys;sys.path.append('{SRC_PATH}/odoo')\"",
                 "--load-plugins=pylint_odoo",
             ],
             "python.linting.pylintEnabled": True,
@@ -254,7 +226,12 @@ def write_code_workspace_file(c, cw_path=None):
         "name": "Attach Python debugger to running container",
         "type": "python",
         "request": "attach",
-        "pathMappings": [],
+        "pathMappings": [
+            {
+                "localRoot": "${workspaceFolder:%s}/odoo" % root_name,  # noqa: UP031
+                "remoteRoot": "/opt/odoo",
+            }
+        ],
         "port": int(ODOO_VERSION) * 1000 + 899,
         # HACK https://github.com/microsoft/vscode-python/issues/14820
         "host": "0.0.0.0",
@@ -304,17 +281,10 @@ def write_code_workspace_file(c, cw_path=None):
             chrome_configuration,
         ],
     }
-    # Configure pathMappings for the main odoo folder
-    debugpy_configuration["pathMappings"].append(
-        {
-            "localRoot": "${workspaceFolder:odoo}/",
-            "remoteRoot": "/opt/odoo/custom/src/odoo",
-        }
-    )
+    # Configure workspace roots and path mappings
     cw_config["folders"] = []
     _scan_subrepos_and_add_path_mappings(
         cw_config,
-        debugpy_configuration,
         firefox_configuration,
         chrome_configuration,
     )
@@ -462,7 +432,7 @@ def write_code_workspace_file(c, cw_path=None):
         ],
     }
     # Sort project folders
-    cw_config["folders"].sort(key=lambda x: x["path"])
+    cw_config["folders"].sort(key=operator.itemgetter("path"))
     # Put Odoo folder just before private and top folder and map to debugpy
     odoo = SRC_PATH / "odoo"
     if odoo.is_dir():
@@ -573,10 +543,7 @@ def start(c, detach=True, debugpy=False, _reload=True, port_prefix=0):
         if detach:
             cmd += " --detach"
         with c.cd(str(PROJECT_ROOT)):
-            env = dict(
-                UID_ENV,
-                DOODBA_DEBUGPY_ENABLE=str(int(debugpy)),
-            )
+            env = UID_ENV | {"DOODBA_DEBUGPY_ENABLE": str(int(debugpy))}
             if port_prefix:
                 env["PORT_PREFIX"] = str(port_prefix)
             result = c.run(
@@ -715,10 +682,9 @@ def updatepot(
     for new_file in new_files:
         file_name = os.path.basename(new_file)
         if file_name.endswith("~"):
-            os.remove(new_file)
+            Path(new_file).unlink()
             continue
-        with open(new_file) as fd:
-            content = fd.read()
+        content = Path(new_file).read_text()
         new_lines = []
         for line in content.splitlines():
             if remove_dates and (
@@ -728,11 +694,10 @@ def updatepot(
                 continue
             new_lines.append(line)
         content = "\n".join(new_lines)
-        with open(new_file, "w") as fd:
-            fd.write(content.strip() + "\n")
+        Path(new_file).write_text(content.strip() + "\n")
     _logger.info(".po[t] files updated")
     precommit_cmd = (
-        f"pre-commit run --files {' '.join(iglob(f'{glob}/*.po*'))}" "--color=always"
+        f"pre-commit run --files {' '.join(iglob(f'{glob}/*.po*'))} --color=always"
     )
     if not repo and module:
         for folder in iglob(f"{PROJECT_ROOT}/odoo/custom/src/*/*"):
@@ -829,10 +794,7 @@ def _test_in_debug_mode(c, odoo_command):
         with c.cd(str(PROJECT_ROOT)):
             c.run(
                 cmd,
-                env=dict(
-                    UID_ENV,
-                    DOODBA_DEBUGPY_ENABLE="1",
-                ),
+                env=UID_ENV | {"DOODBA_DEBUGPY_ENABLE": "1"},
                 pty=True,
             )
         _logger.info("Waiting for services to spin up...")
@@ -892,6 +854,7 @@ def _get_module_list(
         "mode": "Mode in which tests run. Options: ['init'(default), 'update']",
         "db_filter": "DB_FILTER regex to pass to the test container Set to ''"
         " to disable. Default: '^devel$'",
+        "tags": "Comma-separated list of tags to test. Default: ',/'.join(modules)",
     },
 )
 def test(
@@ -906,6 +869,7 @@ def test(
     cur_file=None,
     mode="init",
     db_filter="^devel$",
+    tags=None,
 ):
     """Run Odoo tests
 
@@ -964,7 +928,10 @@ def test(
         # Limit tests to explicit list
         # Filter spec format (comma-separated)
         # [-][tag][/module][:class][.method]
-        odoo_command.extend(["--test-tags", f"/{',/'.join(modules_list)}"])
+        test_tags = f"/{',/'.join(modules_list)}"
+        if tags:
+            test_tags = tags
+        odoo_command.extend(["--test-tags", test_tags])
     if debugpy:
         _test_in_debug_mode(c, odoo_command)
     else:
@@ -1040,23 +1007,11 @@ def resetdb(
         )
         lang = os.getenv("INITIAL_LANG")
         lang_opt = f" --lang {lang}" if lang else ""
-        if ODOO_VERSION >= 19:
-            # Odoo 19: Registry.new(force_demo=...) removed → avoid click-odoo-initdb
-            # Use native Odoo CLI; --without-demo=all replaces force_demo=False
-            lang_opt19 = f" --load-language={lang}" if lang else ""
-            c.run(
-                f"{_run} odoo --stop-after-init -d {dbname} -i {modules}"
-                f"{lang_opt19} --without-demo=all",
-                env=UID_ENV,
-                pty=True,
-            )
-        else:
-            # Older versions keep using click-odoo-initdb
-            c.run(
-                f"{_run} click-odoo-initdb -n {dbname} -m {modules}{lang_opt}",
-                env=UID_ENV,
-                pty=True,
-            )
+        c.run(
+            f"{_run} click-odoo-initdb -n {dbname} -m {modules}{lang_opt}",
+            env=UID_ENV,
+            pty=True,
+        )
     if populate and ODOO_VERSION < 11:
         _logger.warn(
             f"Skipping populate task as it is not available in v{ODOO_VERSION}"
@@ -1219,10 +1174,10 @@ def restore_snapshot(
                     db_list.append((db_name, db_date))
                 except ValueError:
                     continue
-            snapshot_name = max(db_list, key=lambda x: x[1])[0]
+            snapshot_name = max(db_list, key=operator.itemgetter(1))[0]
             if not snapshot_name:
                 raise exceptions.PlatformError(
-                    "No snapshot found for destination_db %s" % destination_db  # noqa: UP031
+                    f"No snapshot found for destination_db {destination_db}"
                 )
         _logger.info("Restoring snapshot %s to %s", (snapshot_name, destination_db))
         _run = f"{DOCKER_COMPOSE_CMD} run --rm -l traefik.enable=false odoo"

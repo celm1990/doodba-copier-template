@@ -1,6 +1,8 @@
-{% import "_macros.jinja" as macros -%}
+{% import "macros/_macros.jinja" as macros -%}
+{% if compose_version == "v1" %}
 version: "2.4"
 
+{% endif %}
 services:
   odoo:
     {%- if odoo_oci_image %}
@@ -46,6 +48,7 @@ services:
     environment:
       POSTGRES_DB: *dbname
       POSTGRES_USER: *dbuser
+      PGDATA: "/var/lib/postgresql/data"
       CONF_EXTRA: |
         work_mem = 512MB
     volumes:
@@ -115,6 +118,9 @@ services:
       PGUSER: *dbuser
       {%- if smtp_relay_host %}
       SMTP_HOST: smtplocal
+      {%- if not backup_smtp_report_success %}
+      SMTP_REPORT_SUCCESS: False
+      {%- endif %}
       {%- endif %}
       TZ: "{{ backup_tz }}"
     volumes:

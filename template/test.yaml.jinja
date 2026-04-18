@@ -1,10 +1,14 @@
-{%- import "_macros.jinja" as macros -%}
-{%- import "_traefik1_labels.yml.jinja" as traefik1_labels -%}
-{%- import "_traefik2_labels.yml.jinja" as traefik2_labels -%}
-{%- import "_traefik3_labels.yml.jinja" as traefik3_labels -%}
+{%- import "macros/_macros.jinja" as macros -%}
+{%- import "macros/_traefik1_labels.yml.jinja" as traefik1_labels -%}
+{%- import "macros/_traefik2_labels.yml.jinja" as traefik2_labels -%}
+{%- import "macros/_traefik3_labels.yml.jinja" as traefik3_labels -%}
 {%- set _key = traefik2_labels.key(project_name, odoo_version, "test") -%}
+{%- set _whitelisted_hosts_test = whitelisted_hosts_test|default([]) -%}
+{%- set domain_spec = domain_spec|default(domains_test) -%}
+{% if compose_version == "v1" %}
 version: "2.4"
 
+{% endif %}
 services:
   odoo:
     extends:
@@ -27,27 +31,33 @@ services:
       ODOO_QUEUE_JOB_CHANNELS: "root:1"
       PGHOST: {{ _key }}-db
     restart: unless-stopped
-    {%- if domains_test %}
-    hostname: {{ macros.first_main_domain(domains_test)|tojson }}
+    {%- if domain_spec %}
+    hostname: {{ macros.first_main_domain(domain_spec)|tojson }}
     {%- endif %}
     depends_on:
       {% if postgres_version -%}
       - db
       {%- endif %}
       - smtp
+    {%- if _whitelisted_hosts_test %}
+      - proxy_general
+    {%- endif %}
     networks:
       default:
       globalwhitelist_shared:
-    {%- if odoo_proxy == "traefik" and domains_test %}
+    {%- if odoo_proxy == "traefik" and domain_spec %}
       inverseproxy_shared:
     {%- endif %}
+    {%- if _whitelisted_hosts_test %}
+      whitelist:
+    {%- endif %}
     labels:
-      doodba.domain.main: {{ macros.first_main_domain(domains_test)|tojson }}
-      {%- if odoo_proxy == "traefik" and domains_test %}
+      doodba.domain.main: {{ macros.first_main_domain(domain_spec)|tojson }}
+      {%- if odoo_proxy == "traefik" and domain_spec %}
       traefik.enable: "true"
-      {{- traefik1_labels.odoo(domains_test, ["/"], odoo_version) }}
+      {{- traefik1_labels.odoo(domain_spec, ["/"], odoo_version) }}
       {{- traefik2_labels.odoo(
-        domains_test,
+        domain_spec,
         cidr_whitelist,
         _key,
         odoo_version,
@@ -73,7 +83,7 @@ services:
     networks:
       default:
         aliases:
-            - "{{ _key }}-db"
+          - "{{ _key }}-db"
     restart: unless-stopped
   {%- endif %}
 
@@ -86,17 +96,17 @@ services:
       default:
         aliases:
           - smtplocal
-    {%- if odoo_proxy == "traefik" and domains_test %}
+    {%- if odoo_proxy == "traefik" and domain_spec %}
       inverseproxy_shared:
     {%- endif %}
     labels:
-      doodba.domain.main: {{ macros.first_main_domain(domains_test)|tojson }}
-      {%- if odoo_proxy == "traefik" and domains_test %}
+      doodba.domain.main: {{ macros.first_main_domain(domain_spec)|tojson }}
+      {%- if odoo_proxy == "traefik" and domain_spec %}
       traefik.docker.network: "inverseproxy_shared"
       traefik.enable: "true"
       {#- Traefik v1 labels #}
       traefik.frontend.passHostHeader: "true"
-      {%- call(domain_group) macros.domains_loop_grouped(domains_test|rejectattr("redirect_to")|rejectattr("path_prefixes")) %}
+      {%- call(domain_group) macros.domains_loop_grouped(domain_spec|rejectattr("redirect_to")|rejectattr("path_prefixes")) %}
       {{-
         traefik1_labels.router(
           prefix="mailhog",
@@ -114,7 +124,7 @@ services:
       traefik.http.middlewares.{{ _key }}-mailhog-stripprefix.stripPrefix.prefixes: /smtpfake/
       traefik.http.services.{{ _key }}-mailhog.loadbalancer.server.port: 8025
       {{- traefik2_labels.common_middlewares(_key, cidr_whitelist) }}
-      {%- call(domain_group) macros.domains_loop_grouped(domains_test|rejectattr("redirect_to")|rejectattr("path_prefixes")) %}
+      {%- call(domain_group) macros.domains_loop_grouped(domain_spec|rejectattr("redirect_to")|rejectattr("path_prefixes")) %}
       {#- Remember basic middlewares for this domain group #}
       {%- set _ns = namespace(basic_middlewares=[]) -%}
       {%- if cidr_whitelist %}
@@ -145,7 +155,46 @@ services:
     entrypoint: [sh, -c]
     command:
       - test -r /etc/mailhog/auth && export MH_AUTH_FILE=/etc/mailhog/auth; exec MailHog
+  {% if _whitelisted_hosts_test %}
+  odoo_net_setup:
+    image: ghcr.io/tecnativa/docker-whitelist-gateway-service:edge
+    network_mode: "service:odoo"
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      - odoo
+      - proxy_general
+    healthcheck:
+      disable: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      MODE_RUN: "net_setup"
+      GATEWAY_NAME: "proxy_general"
+      DNS_LOCAL: "1"
+      DNS_INTERNAL_FROM_DOCKER: "1"
+      DOCKER_PROJECT: "${COMPOSE_PROJECT_NAME:-{{ whitelist_docker_project_test }}}"
+      DOCKER_PRIMARY_SERVICE: "odoo"
+      ALLOWED_HOSTS: >-
+        {{ _whitelisted_hosts_test|join(' ') }}
 
+  proxy_general:
+    image: ghcr.io/tecnativa/docker-whitelist-gateway-service:edge
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      whitelist:
+        aliases:
+          - proxy_general
+      public:
+    environment:
+      MODE_RUN: "gateway"
+      ALLOWED_HOSTS: >-
+        {{ _whitelisted_hosts_test|join(' ') }}
+  {% endif %}
 networks:
   default:
     internal: ${DOODBA_NETWORK_INTERNAL-true}
@@ -158,6 +207,11 @@ networks:
 
   inverseproxy_shared:
     external: true
+  {%- endif %}
+
+  {%- if _whitelisted_hosts_test %}
+  public:
+  whitelist:
   {%- endif %}
 
 volumes:

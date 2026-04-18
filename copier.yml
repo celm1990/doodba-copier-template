@@ -1,32 +1,12 @@
 # Configure jinja2 defaults to make syntax highlighters lives easier
 _templates_suffix: .jinja
-
+_subdirectory: template
 # Other Copier configurations
 _min_copier_version: "9"
 _exclude:
-  - _macros
-  - _traefik*_labels.yml
-  - /.git
-  - /.github/ISSUE_TEMPLATE
-  - /.github/dependabot.yml
-  - /.github/workflows/dependabot-merge.yml
-  - /.github/workflows/test.yml
-  - /.gitmodules
-  - /.vscode/launch.json
-  - /.vscode/settings.json
   - /**.pyc
   - /**.pyo
-  - /CONTRIBUTING.md
-  - /copier.yml
-  - /COPYING
-  - /docs
-  - /migrations.py
-  - /poetry.lock
-  - /pyproject.toml
-  - /scripts
-  - /tasks_downstream.py
-  - /tests
-  - /vendor
+  - tasks_downstream.py
 
 _skip_if_exists:
   - odoo/custom/dependencies/*.txt
@@ -141,6 +121,18 @@ traefik_version:
     v2.9: 2
     v3.2: 3
 
+compose_version:
+  type: str
+  help: >-
+    Indicate the Docker Compose version.
+
+    Used to generate the Docker Compose files so that they are compatible with the
+    indicated version.
+  default: "{{ 'v1' if _copier_operation == 'update' else 'v2+'}}"
+  choices:
+    - v1
+    - v2+
+
 odoo_initial_lang:
   default: es_EC
   type: str
@@ -209,6 +201,14 @@ project_license:
     MIT license: MIT
     Odoo Enterprise Edition License v1.0: OEEL-1.0
     Odoo Proprietary License v1.0: OPL-1.0
+
+use_refurb:
+  default: false
+  type: bool
+  help:
+    Use refurb (https://github.com/dosisod/refurb) for refurbishing and modernizing
+    Python codebase.
+  when: "{{ odoo_version >= 13.0 }}"
 
 docker_registry:
   type: str
@@ -393,6 +393,117 @@ domains_test:
 
     💡 The 1st host from the 1st domain that has no `path_prefixes` will be considered
     the main one. In the example above, it'd be `demo1.main.com`.
+domains_migration:
+  type: yaml
+  multiline: true
+  default: {}
+  placeholder: |
+    # Main domains, with TLS and cert resolved with "letsencrypt" resolver
+    - hosts:
+        - demo1.main.com
+        - demo2.main.com
+
+    # Alternate domains that redirect to main ones
+    - hosts:
+        - www.demo1.main.com
+        - old.demo1.main.com
+      redirect_to: demo1.main.com
+    - hosts:
+        - www.demo2.main.com
+        - old.demo2.main.com
+      redirect_to: demo2.main.com
+      redirect_permanent: True
+
+    # VPN-only domain, with self-signed certificate
+    - hosts:
+        - vpn.demo.main.com
+      cert_resolver: true
+  help: |
+    Configure the migration domains for this project.
+
+    The format is the same as for `prod_domains`; a list with these keys:
+
+    - hosts: The domain names. List of strings.
+    - path_prefixes: The path prefixes (if any) that will match this routing rule.
+      List of strings. Default: [].
+    - redirect_to: Apply a redirection to this other domain. By default, it will be a
+      302 redirection, but it can be turned into a 301 redirection by enabling the
+      `redirect_permanent` option.
+      String. Default: null.
+    - redirect_permanent: Return 301 instead of 302 in a Traefik redirection, making it permanent.
+      Boolean. Default: False.
+    - cert_resolver: Traefik cert resolver name. String/Boolean. Default: "letsencrypt".
+      Set it to `true` to use a self-signed certificate. Set it to `false` to
+      disable TLS in those domains. If not `false`, it will force using HTTPS.
+    - entrypoints: List of entrypoint names to use when creating this rule. Default: [].
+      Leave empty to apply this rule on all available entrypoints. Those are defined
+      in your Traefik deployment.
+
+    See https://www.tecnativa.com/r/Y0v for an example.
+
+    ⚠ Remember that you have to write one-line YAML, at least until Copier
+    supports multiline input
+
+    ⚠ Some advanced features are only available if you deploy with Traefik 2.
+
+    💡 The 1st host from the 1st domain that has no `path_prefixes` will be considered
+    the main one. In the example above, it'd be `demo1.main.com`.
+whitelisted_hosts_test:
+  type: yaml
+  multiline: true
+  default: []
+  help: |
+    Extra external hosts to allow from **test/demo/migration** instances (optional).
+
+    Example:
+      - api.example.com
+      - example.com
+
+    If you provide one or more hostnames/IPs here, the template will inject the
+    docker-whitelist-gateway setup in `test.yaml`, so the Odoo container can only
+    resolve/reach those hosts (plus whatever is already reachable via your existing
+    `globalwhitelist_shared` network).
+
+    Leave empty (`[]`) to keep the current behavior (no additional egress).
+
+whitelisted_hosts_devel:
+  type: yaml
+  multiline: true
+  default:
+    - cdnjs.cloudflare.com
+    - fonts.googleapis.com
+    - fonts.gstatic.com
+    - www.google.com
+    - www.googleapis.com
+    - www.gravatar.com
+  placeholder: |
+    - api.example.com
+    - example.com
+  help: |
+    Extra external hosts to allow from **devel** environment (optional).
+
+    If you provide one or more hostnames/IPs here, the template will inject the
+    docker-whitelist-gateway setup in `devel.yaml`, so the Odoo container can only
+    resolve/reach those hosts.
+
+whitelist_docker_project_devel:
+  type: str
+  when: "{{ (whitelisted_hosts_devel or []) | length > 0 }}"
+  default: "{{ project_name | replace('.', '-') }}"
+  help: >-
+    Docker Compose project name used by the whitelist sidecar in devel to discover
+    internal services through Docker metadata.
+
+whitelist_docker_project_test:
+  type: str
+  when: "{{ (whitelisted_hosts_test or []) | length > 0 }}"
+  default: "demo-{{ project_name | replace('.', '-') }}-{{ odoo_version | int }}"
+  help: >-
+    Docker Compose project name used by the whitelist sidecar in test/demo to discover
+    internal services through Docker metadata.
+
+    The proposed default matches our usual naming convention, but this value may need to
+    change depending on how each company/person deploys the project.
 
 paths_without_crawlers:
   multiline: true
@@ -746,6 +857,17 @@ backup_email_to:
   help: >-
     Where to send those backup reports?
   default: ""
+
+backup_smtp_report_success:
+  type: bool
+  when: *backup_present
+  help: >-
+    Keep a close eye on your backup jobs!
+
+    If enabled (default), backup jobs report via SMTP regardless of exit status.
+
+    Otherwise, backup jobs only report via SMTP if one or more jobs failed.
+  default: true
 
 backup_deletion:
   default: false

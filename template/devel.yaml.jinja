@@ -1,14 +1,9 @@
-{%- import "_macros.jinja" as macros -%}
-{% set whitelisted_hosts = (
-  "cdnjs.cloudflare.com",
-  "fonts.googleapis.com",
-  "fonts.gstatic.com",
-  "www.google.com",
-  "www.googleapis.com",
-  "www.gravatar.com",
-) -%}
+{%- import "macros/_macros.jinja" as macros -%}
+{% set whitelisted_hosts = whitelisted_hosts_devel | default([]) -%}
+{% if compose_version == "v1" %}
 version: "2.4"
 
+{% endif %}
 services:
   odoo_proxy:
     image: ghcr.io/tecnativa/docker-whitelist:latest
@@ -18,9 +13,9 @@ services:
       default:
       public:
     ports:
-      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) }}}899:6899"
-      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) }}}069:8069"
-      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) }}}072:8072"
+      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) -}} }899:6899"
+      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) -}} }069:8069"
+      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) -}} }072:8072"
     environment:
       PORT: "6899 8069 8072"
       TARGET: odoo
@@ -48,11 +43,15 @@ services:
       PGDATABASE: &dbname devel
       DB_FILTER: *dbname
       DB_NAME: *dbname
+      PYDEVD_RESOLVE_SYMLINKS: 1
       PYTHONDONTWRITEBYTECODE: 1
       PYTHONOPTIMIZE: ""
       PYTHONPATH: /opt/odoo/custom/src/odoo
       SMTP_PORT: "1025"
-      WDB_WEB_PORT: "${PORT_PREFIX:-{{ macros.version_major(odoo_version) }}}984"
+      {%- if whitelisted_hosts %}
+      WDB_SOCKET_SERVER: "wdb_internal"
+      {%- endif %}
+      WDB_WEB_PORT: "${PORT_PREFIX:-{{ macros.version_major(odoo_version) -}} }984"
       # To avoid installing demo data export DOODBA_WITHOUT_DEMO=all
       WITHOUT_DEMO: "${DOODBA_WITHOUT_DEMO-false}"
     volumes:
@@ -62,11 +61,16 @@ services:
       {% if postgres_version -%}
       - db
       {%- endif %}
-      {% for host in whitelisted_hosts -%}
-      - proxy_{{ host|replace(".", "_") }}
-      {% endfor -%}
       - smtp
       - wdb
+      {%- if whitelisted_hosts %}
+      - proxy_general
+      {%- endif %}
+    {%- if whitelisted_hosts %}
+    networks:
+      default:
+      whitelist:
+    {%- endif %}
     command:
       - odoo
       - --limit-memory-soft=0
@@ -92,18 +96,24 @@ services:
     environment:
       POSTGRES_DB: *dbname
       POSTGRES_PASSWORD: odoopassword
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   {%- endif %}
 
   pgweb:
     image: docker.io/sosedoff/pgweb
     networks: *public
     ports:
-      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) }}}081:8081"
+      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) -}} }081:8081"
     environment:
-      DATABASE_URL: postgres://{{ postgres_username }}:odoopassword@{{ pg_host }}:5432/devel?sslmode=disable
+      PGWEB_DATABASE_URL: postgres://{{ postgres_username }}:odoopassword@{{ pg_host }}:5432/devel?sslmode=disable
     {% if postgres_version -%}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     {%- endif %}
 
   smtp:
@@ -112,33 +122,71 @@ services:
       service: smtpfake
     networks: *public
     ports:
-      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) }}}025:8025"
+      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) -}} }025:8025"
 
   wdb:
     image: docker.io/kozea/wdb
-    networks: *public
-    ports:
-      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) }}}984:1984"
-    # HACK https://github.com/Kozea/wdb/issues/136
-    init: true
-
-  # Whitelist outgoing traffic for tests, reports, etc.
-{%- for host in whitelisted_hosts %}
-  proxy_{{ host|replace(".", "_") }}:
-    image: ghcr.io/tecnativa/docker-whitelist:latest
+{%- if whitelisted_hosts %}
     networks:
       default:
         aliases:
-          - {{ host }}
+          - wdb_internal
+      public:
+{%- else %}
+    networks: *public
+{%- endif %}
+    ports:
+      - "127.0.0.1:${PORT_PREFIX:-{{ macros.version_major(odoo_version) -}} }984:1984"
+    # HACK https://github.com/Kozea/wdb/issues/136
+    init: true
+{%- if whitelisted_hosts %}
+
+  odoo_net_setup:
+    image: ghcr.io/tecnativa/docker-whitelist-gateway-service:edge
+    network_mode: "service:odoo"
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      - odoo
+      - proxy_general
+    healthcheck:
+      disable: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      MODE_RUN: "net_setup"
+      GATEWAY_NAME: "proxy_general"
+      DNS_LOCAL: "1"
+      DNS_INTERNAL_FROM_DOCKER: "1"
+      DOCKER_PROJECT: "${COMPOSE_PROJECT_NAME:-{{ whitelist_docker_project_devel }}}"
+      DOCKER_PRIMARY_SERVICE: "odoo"
+      ALLOWED_HOSTS: >-
+        {{ whitelisted_hosts | join(" ") }}
+
+  proxy_general:
+    image: ghcr.io/tecnativa/docker-whitelist-gateway-service:edge
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      whitelist:
+        aliases:
+          - proxy_general
       public:
     environment:
-      TARGET: {{ host }}
-      PRE_RESOLVE: 1
-{% endfor %}
+      MODE_RUN: "gateway"
+      ALLOWED_HOSTS: >-
+        {{ whitelisted_hosts | join(" ") }}
+
+{%- endif %}
 networks:
   default:
     internal: ${DOODBA_NETWORK_INTERNAL-true}
   public:
+{%- if whitelisted_hosts %}
+  whitelist:
+{%- endif %}
 
 volumes:
   filestore:
