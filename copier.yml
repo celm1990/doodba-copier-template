@@ -77,6 +77,24 @@ _migrations:
         - db-filter-prefix-default
         - "{{ _copier_conf.dst_path }}"
         - "{{ _copier_conf.answers_file }}"
+  - version: v9.2.1
+    before:
+      - - invoke
+        - --search-root={{ _copier_conf.src_path }}
+        - --collection=migrations
+        - migrate-to-new-proxy
+        - "{{ _copier_conf.dst_path }}"
+        - "{{ _copier_conf.answers_file }}"
+  - version: v9.6.0
+    before:
+      - - invoke
+        - --search-root={{ _copier_conf.src_path }}
+        - --collection=migrations
+        - add-new-domains
+        - "{{ _copier_conf.dst_path }}"
+        - "{{ _copier_conf.answers_file }}"
+        - "9.6.0"
+        - "--varname=whitelisted_hosts_test"
 
 # Questions for the user
 odoo_version:
@@ -451,7 +469,37 @@ domains_migration:
 whitelisted_hosts_test:
   type: yaml
   multiline: true
-  default: []
+  default:
+    - accounts.google.com
+    - api.openrouteservice.org
+    - api.unsplash.com
+    - apis.google.com
+    - cdnjs.cloudflare.com
+    - download.geonames.org
+    - ec.europa.eu
+    - fonts.cdnfonts.com
+    - fonts.googleapis.com
+    - fonts.gstatic.com
+    - images.unsplash.com
+    - iap-services.odoo.com
+    - maps.googleapis.com
+    - media-api.odoo.com
+    - olg.api.odoo.com
+    - www.google.com
+    - www.googleapis.com
+    - www.gravatar.com
+    - undraw.co
+    - updates.maxmind.com
+    - www.ecb.europa.eu # For OCA currency_rate_update module
+    - www.xe.com # For OCA currency_rate_update_xe module
+    - sis-t.redsys.es # For redsys tests
+    - prewww1.aeat.es # Required for SII
+    - www2.agenciatributaria.gob.es # Required for SII
+    - www.openstreetmap.org # Required for partner_external_map
+    - nominatim.openstreetmap.org # Required for partner_external_map
+    - www.bizkaia.eus # Required for l10n_es_aeat_sii_oca
+    - sii.araba.eus # Required for l10n_es_aeat_sii_oca
+    - vies.api.odoo.com # Required for base_vat
   help: |
     Extra external hosts to allow from **test/demo/migration** instances (optional).
 

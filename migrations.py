@@ -194,3 +194,107 @@ def db_filter_prefix_default(c, dst_path, answers_rel_path):
                 'DB_FILTER: ".*"', f'DB_FILTER: "^{postgres_dbname}"'
             )
         )
+
+
+def get_old_proxy_data(compose_file_path):
+    data = _load_yaml(compose_file_path)
+    services = data.get("services", {})
+    domains = set()
+    containers = set()
+    for service_name, service in services.items():
+        image = service.get("image", "")
+        if "tecnativa/docker-whitelist" not in image:
+            continue
+        containers.add(service_name)
+        networks = service.get("networks", {})
+        for net_conf in networks.values():
+            if not net_conf:
+                continue
+            aliases = net_conf.get("aliases", [])
+            for alias in aliases:
+                domains.add(alias)
+    return domains, containers
+
+
+def _add_new_items_to_list(dst_path, answers_rel_path, varname, items):
+    answers_path = Path(dst_path, answers_rel_path)
+    answers_yaml = _load_yaml(answers_path)
+    if varname not in answers_yaml:
+        answers_yaml[varname] = []
+    for item in items:
+        if item not in answers_yaml[varname]:
+            answers_yaml[varname].append(item)
+    answers_path.write_text(yaml.safe_dump(answers_yaml))
+
+
+@task
+def migrate_to_new_proxy(c, dst_path, answers_rel_path):
+    devel_compose = Path(dst_path, "devel.yaml")
+    test_compose = Path(dst_path, "test.yaml")
+    test_domains, test_containers = get_old_proxy_data(test_compose)
+    devel_domains, devel_containers = get_old_proxy_data(devel_compose)
+    _add_new_items_to_list(
+        dst_path, answers_rel_path, "whitelisted_hosts_test", test_domains
+    )
+    _add_new_items_to_list(
+        dst_path, answers_rel_path, "whitelisted_hosts_devel", devel_domains
+    )
+    devel_data = _load_yaml(devel_compose)
+    test_data = _load_yaml(test_compose)
+    devel_data["services"]["odoo"]["depends_on"] = [
+        item
+        for item in devel_data["services"]["odoo"]["depends_on"]
+        if item not in devel_containers
+    ]
+    test_data["services"]["odoo"]["depends_on"] = [
+        item
+        for item in test_data["services"]["odoo"]["depends_on"]
+        if item not in test_containers
+    ]
+    devel_compose.write_text(yaml.safe_dump(devel_data))
+    test_compose.write_text(yaml.safe_dump(test_data))
+
+
+@task
+def add_new_domains(
+    c, dst_path, answers_rel_path, version, varname="whitelisted_hosts_test"
+):
+    # We need to keep a list of new domains added per version to add them in upgrades
+    # TODO: Maybe fix this in copier
+    domains_version = {
+        "9.6.0": [
+            "accounts.google.com",
+            "api.openrouteservice.org",
+            "api.unsplash.com",
+            "apis.google.com",
+            "cdnjs.cloudflare.com",
+            "download.geonames.org",
+            "ec.europa.eu",
+            "fonts.cdnfonts.com",
+            "fonts.googleapis.com",
+            "fonts.gstatic.com",
+            "images.unsplash.com",
+            "iap-services.odoo.com",
+            "maps.googleapis.com",
+            "media-api.odoo.com",
+            "olg.api.odoo.com",
+            "www.google.com",
+            "www.googleapis.com",
+            "www.gravatar.com",
+            "undraw.co",
+            "updates.maxmind.com",
+            "www.ecb.europa.eu",
+            "www.xe.com",
+            "sis-t.redsys.es",
+            "prewww1.aeat.es",
+            "www2.agenciatributaria.gob.es",
+            "www.openstreetmap.org",
+            "nominatim.openstreetmap.org",
+            "www.bizkaia.eus",
+            "sii.araba.eus",
+            "vies.api.odoo.com",
+        ]
+    }
+    _add_new_items_to_list(
+        dst_path, answers_rel_path, varname, domains_version[version]
+    )

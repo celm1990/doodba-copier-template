@@ -229,6 +229,23 @@ def traefik_host(request):
     assert " level=warn " not in traefik_logs
 
 
+def override_odoo_entrypoint(path, entrypoint=None, command=None):
+    entrypoint = entrypoint or ["sh", "-c"]
+    command = command or ["sleep 3600"]
+    override_data = yaml.safe_dump(
+        {
+            "services": {
+                "odoo": {
+                    "entrypoint": entrypoint,
+                    "command": command,
+                }
+            }
+        }
+    )
+    override_file = path / "docker-compose.override.yml"
+    override_file.write_text(override_data)
+
+
 def teardown_function(function):
     pre_commit_log = (
         Path("~") / ".cache" / "pre-commit" / "pre-commit.log"

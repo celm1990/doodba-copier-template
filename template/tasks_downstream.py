@@ -8,11 +8,14 @@ Contains common helpers to develop using this child project.
 import json
 import operator
 import os
+import platform
+import re
 import shutil
 import stat
 import subprocess
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from glob import iglob
 from itertools import chain
@@ -448,6 +451,165 @@ def write_code_workspace_file(c, cw_path=None):
         cw_fd.write("\n")
 
 
+def _pycharm_version_key(path):
+    """Sort PyCharm config dirs by product priority and version."""
+    name = path.name
+    # Prefer modern PyCharm/PyCharmCE names over legacy PyCharmCE2020.x
+    # style only by version
+    product_priority = (
+        1 if name.startswith("PyCharm") and not name.startswith("PyCharmCE") else 0
+    )
+    version_match = re.search(r"(\d{4})\.(\d+)", name)
+    if version_match:
+        version = tuple(map(int, version_match.groups()))
+    else:
+        version = (0, 0)
+    return product_priority, version, name
+
+
+def get_pycharm_config_dirs():
+    """Return possible PyCharm config directories for Linux, macOS and Windows."""
+    system = platform.system()
+    if system == "Linux":
+        base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        jetbrains = base / "JetBrains"
+    elif system == "Darwin":
+        jetbrains = Path.home() / "Library" / "Application Support" / "JetBrains"
+    elif system == "Windows":
+        appdata = os.environ.get("APPDATA")
+        if not appdata:
+            return []
+        jetbrains = Path(appdata) / "JetBrains"
+    else:
+        return []
+    candidates = list(jetbrains.glob("PyCharm*")) + list(jetbrains.glob("PyCharmCE*"))
+    return sorted({p for p in candidates if p.is_dir()}, key=_pycharm_version_key)
+
+
+def get_pycharm_tools_dir():
+    """Return the latest existing PyCharm tools directory."""
+    pycharm_dirs = get_pycharm_config_dirs()
+    if not pycharm_dirs:
+        return None
+    return pycharm_dirs[-1] / "tools"
+
+
+def write_pycharm_external_tools():
+    """Ensure required PyCharm External Tools exist."""
+    tools_dir = get_pycharm_tools_dir()
+    if not tools_dir:
+        # PyCharm not installed → silently skip
+        return
+    tools_dir.mkdir(parents=True, exist_ok=True)
+    tools_path = tools_dir / "External Tools.xml"
+    tools_to_ensure = {
+        "Start Debug Test": "test --cur-file $FilePath$ --debugpy",
+        "Start Debug": "start --detach --debugpy",
+    }
+    if tools_path.exists():
+        try:
+            root = ET.fromstring(tools_path.read_text(encoding="utf-8"))
+        except ET.ParseError:
+            root = ET.Element("toolSet", {"name": "External Tools"})
+    else:
+        root = ET.Element("toolSet", {"name": "External Tools"})
+    existing = {tool.get("name") for tool in root.findall("tool")}
+    for name, params in tools_to_ensure.items():
+        if name in existing:
+            continue
+        tool = ET.SubElement(
+            root,
+            "tool",
+            {
+                "name": name,
+                "showInMainMenu": "false",
+                "showInEditor": "false",
+                "showInProject": "false",
+                "showInSearchPopup": "false",
+                "disabled": "false",
+                "useConsole": "true",
+                "showConsoleOnStdOut": "false",
+                "showConsoleOnStdErr": "false",
+                "synchronizeAfterRun": "true",
+            },
+        )
+        exec_node = ET.SubElement(tool, "exec")
+        ET.SubElement(exec_node, "option", {"name": "COMMAND", "value": "invoke"})
+        ET.SubElement(exec_node, "option", {"name": "PARAMETERS", "value": params})
+        ET.SubElement(
+            exec_node,
+            "option",
+            {"name": "WORKING_DIRECTORY", "value": "$ProjectFileDir$"},
+        )
+    ET.indent(root, space="  ")
+    tools_path.write_text(
+        ET.tostring(root, encoding="unicode") + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_pycharm_debug_run_configuration_file():
+    """Create/update PyCharm run configuration to attach debugpy."""
+    config_path = PROJECT_ROOT / ".idea" / "runConfigurations" / "Debug_odoo.xml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    debugpy_port = int(ODOO_VERSION) * 1000 + 899
+    xml = f"""<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Debug odoo" type="PythonDapAttachConfiguration">
+    <pathMappings>
+      <mapping local="$PROJECT_DIR$/odoo" remote="/opt/odoo" />
+    </pathMappings>
+    <option name="remoteAddress" value="localhost:{debugpy_port}" />
+    <option name="remoteRoot" />
+    <method v="2">
+      <option
+        name="ToolBeforeRunTask"
+        enabled="true"
+        actionId="Tool_External Tools_Start Debug"
+      />
+    </method>
+  </configuration>
+</component>
+"""
+    config_path.write_text(xml, encoding="utf-8")
+
+
+def write_pycharm_attach_test_debug_run_configuration_file():
+    """Create/update PyCharm DAP attach configuration for current module tests."""
+    config_path = (
+        PROJECT_ROOT
+        / ".idea"
+        / "runConfigurations"
+        / "Test_and_debug_current_module.xml"
+    )
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    debugpy_port = int(ODOO_VERSION) * 1000 + 899
+    xml = f"""<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Test and debug current module"
+    type="PythonDapAttachConfiguration">
+    <pathMappings>
+      <mapping local="$PROJECT_DIR$/odoo" remote="/opt/odoo" />
+    </pathMappings>
+    <option name="remoteAddress" value="localhost:{debugpy_port}" />
+    <option name="remoteRoot" />
+    <method v="2">
+      <option
+        name="ToolBeforeRunTask"
+        enabled="true"
+        actionId="Tool_External Tools_Start Debug Test"
+      />
+    </method>
+  </configuration>
+</component>
+"""
+    config_path.write_text(xml, encoding="utf-8")
+
+
+def write_pycharm_debugger_configurations():
+    write_pycharm_external_tools()
+    write_pycharm_debug_run_configuration_file()
+    write_pycharm_attach_test_debug_run_configuration_file()
+
+
 @task
 def develop(c):
     """Set up a basic development environment."""
@@ -462,6 +624,7 @@ def develop(c):
         c.run("git init")
         c.run("ln -sf devel.yaml docker-compose.yml")
         write_code_workspace_file(c)
+        write_pycharm_debugger_configurations()
         c.run("pre-commit install")
 
 
