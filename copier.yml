@@ -491,14 +491,8 @@ whitelisted_hosts_test:
     - undraw.co
     - updates.maxmind.com
     - www.ecb.europa.eu # For OCA currency_rate_update module
-    - www.xe.com # For OCA currency_rate_update_xe module
-    - sis-t.redsys.es # For redsys tests
-    - prewww1.aeat.es # Required for SII
-    - www2.agenciatributaria.gob.es # Required for SII
     - www.openstreetmap.org # Required for partner_external_map
     - nominatim.openstreetmap.org # Required for partner_external_map
-    - www.bizkaia.eus # Required for l10n_es_aeat_sii_oca
-    - sii.araba.eus # Required for l10n_es_aeat_sii_oca
     - vies.api.odoo.com # Required for base_vat
   help: |
     Extra external hosts to allow from **test/demo/migration** instances (optional).
