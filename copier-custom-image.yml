@@ -1,0 +1,26 @@
+# Odoo image customizations on top of the upstream Doodba template.
+#
+# Included in copier.yml in place of upstream's odoo_oci_image question (moved
+# after project_name), so docker_registry is asked before odoo_oci_image and
+# its default can use docker_registry, project_author and project_name.
+
+docker_registry:
+  type: str
+  help: >-
+    Which OCI/Docker image registry will host the Odoo images built with this Doodba
+    project? Specify only the registry host, without the image path. It is used to
+    log in from the CI workflow and as the prefix of the default Odoo image.
+
+    Example: registry.gitlab.com, ghcr.io or docker.io
+  default: "registry.gitlab.com"
+
+odoo_oci_image:
+  type: str
+  help: >-
+    If you are using an OCI/Docker image registry (such as the Docker Hub, Quay or
+    Gitlab registry) to publish the Odoo images that will be built with this Doodba
+    project, specify here the path to the odoo image built with it. Leave it empty if
+    you are not using a registry.
+
+    Example: docker.io/myteam/example-odoo
+  default: "{{ docker_registry }}/{{ project_author.lower() }}/{{ project_name }}"
