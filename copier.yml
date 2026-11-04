@@ -187,7 +187,9 @@ traefik_version:
     v1.7: 1
     v2.4: 2
     v3.0: 3
-
+---
+!include copier-custom-traefik.yml
+---
 compose_version:
   type: str
   help: >-

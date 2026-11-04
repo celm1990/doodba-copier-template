@@ -1,0 +1,59 @@
+# Traefik customizations on top of the upstream Doodba template.
+#
+# Included in copier.yml right after upstream's traefik_version question, so new
+# questions are asked there. Overrides replace the whole upstream question and
+# are only safe here for questions defined before this include.
+
+# Overrides of upstream questions
+traefik_version:
+  type: int
+  default: 3
+  when: "{{ odoo_proxy == 'traefik' }}"
+  help: >
+    Indicate Traefik version( v2 recommended )
+  choices:
+    v1.7: 1
+    v2.9: 2
+    v3.2: 3
+
+# New questions
+ssl_email:
+  type: str
+  default: ssl@example.com
+  when: &use_traefik "{{ odoo_proxy == 'traefik' }}"
+  help: >-
+    Email to SSL?
+
+enable_traefik_dashboard:
+  default: false
+  type: bool
+  when: *use_traefik
+  help: Enable traefik dashboard?
+
+traefik_dashboard_domain:
+  type: str
+  default: dashboard.example.com
+  when: &enable_traefik_dashboard "{{ enable_traefik_dashboard and true }}"
+  help: >-
+    Domain to traefik dashboard?
+
+traefik_dashboard_user:
+  type: str
+  default: admin
+  when: *enable_traefik_dashboard
+  help: >-
+    User to access into traefik dashboard?
+
+traefik_dashboard_password:
+  type: str
+  secret: true
+  default: ""
+  when: *enable_traefik_dashboard
+  help: >-
+    Password to access into traefik dashboard.
+
+    Passwords must be hashed using MD5, SHA1, or BCrypt.
+
+    TIP: Use htpasswd or https://bcrypt-generator.com/ to generate the passwords.
+
+    NOTE: Please ensure than the special characters are escaped(as $ must be $$).
