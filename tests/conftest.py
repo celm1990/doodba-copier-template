@@ -12,14 +12,15 @@ from typing import Union
 import pytest
 import yaml
 from copier import run_copy
+from copier._template import load_template_config
 from plumbum import ProcessExecutionError, local
 from plumbum.cmd import git, invoke
 from python_on_whales import DockerClient, DockerException, docker
 
 _logger = logging.getLogger(__name__)
 
-with open("copier.yml") as copier_fd:
-    COPIER_SETTINGS = yaml.safe_load(copier_fd)
+# Use copier's loader to resolve the `!include copier-custom.yml` overrides
+COPIER_SETTINGS = load_template_config(Path("copier.yml"))
 
 # Different tests test different Odoo versions
 OLDEST_SUPPORTED_ODOO_VERSION = 11.0
