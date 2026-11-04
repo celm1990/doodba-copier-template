@@ -34,11 +34,15 @@ services:
       SMTP_SERVER: smtplocal
       {%- endif %}
       PGHOST: {{ _key }}-db
+    {% if postgres_version or smtp_relay_host -%}
     depends_on:
+    {% if postgres_version -%}
       - db
+    {%- endif %}
       {%- if smtp_relay_host %}
       - smtp
       {%- endif %}
+    {%- endif %}
     networks:
       default:
     {%- if odoo_proxy == "traefik" and domains_prod %}
@@ -94,10 +98,11 @@ services:
     extends:
       file: common.yaml
       service: db
-    environment:
-      DB_HOST: {{ _key }}-db
     env_file:
       - .docker/db-creation.env
+    environment:
+      DB_HOST: {{ _key }}-db
+      {{ pg_tune_conf }}
     restart: unless-stopped
     networks:
       default:
@@ -117,7 +122,7 @@ services:
         project_name,
         passthrough=postgres_exposed_mtls,
       ) }}
-    {%- else %}
+    {%- elif postgres_open_port %}
     ports:
       - "{{ postgres_exposed_port }}:5432"
     {%- endif %}
@@ -170,7 +175,9 @@ volumes:
   backup_cache:
   {%- endif %}
   filestore:
+  {% if postgres_version -%}
   db:
+  {%- endif %}
   {%- if smtp_relay_host %}
   mailconfig:
   maildata:

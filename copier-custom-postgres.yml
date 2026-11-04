@@ -1,0 +1,80 @@
+# PostgreSQL customizations on top of the upstream Doodba template.
+#
+# Included at the end of copier.yml. Overrides replace the whole upstream
+# question (keeping its position); new questions are asked after upstream ones.
+
+# Overrides of upstream questions
+postgres_dbname:
+  type: str
+  default: "{{ project_name }}"
+  help: >-
+    💡 If database names differ among environments, operations like restoring a database
+    from an alien environment will be harder to maintain, but can provide additional
+    security. It's up to you. We default to "prod" for historical reasons.
+
+    What is going to be the main database name?
+
+postgres_password:
+  secret: true
+  default: odoo
+  type: str
+  help: >-
+    What will be your postgres user password?
+
+postgres_exposed:
+  default: false
+  type: bool
+  when: "{{ postgres_version }}"
+  help: >-
+    Do you want to expose database service?
+
+postgres_exposed_port:
+  default: 5432
+  type: int
+  when: "{{ (postgres_exposed and traefik_version != 3) or not postgres_version }}"
+  help: >-
+    Indicate the port to connect to the database.
+
+postgres_exposed_databases:
+  type: yaml
+  default: "{{ [postgres_dbname] | tojson }}"
+  when: "{{ postgres_exposed }}"
+  help: >-
+    Set here the databases that should be accesible from WAN when postgres is exposed.
+
+    ⚠️ It must be a list.
+
+# New questions
+pg_tune_conf:
+  when: "{{ postgres_version }}"
+  type: str
+  multiline: true
+  default: |
+    CONF_EXTRA: |
+            max_connections = 100
+            shared_buffers = 768MB
+            effective_cache_size = 2304MB
+            maintenance_work_mem = 192MB
+            checkpoint_completion_target = 0.9
+            wal_buffers = 16MB
+            default_statistics_target = 100
+            random_page_cost = 1.1
+            effective_io_concurrency = 200
+            work_mem = 3932kB
+            min_wal_size = 2GB
+            max_wal_size = 8GB
+            max_locks_per_transaction = 200
+  help: Configuracion de PG Tune?
+
+pg_host:
+  type: str
+  default: "db"
+  help: >-
+    URL o IP para conectarse a postgres
+
+postgres_open_port:
+  default: false
+  type: bool
+  when: "{{ postgres_version and postgres_exposed and traefik_version != 3 }}"
+  help: >-
+    Do you want to Open Ports database service?

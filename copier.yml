@@ -877,3 +877,5 @@ postgres_exposed_users:
     Set here the users that should be able to access postgres from WAN when its exposed.
 
     ⚠️ It must be a list.
+---
+!include copier-custom-postgres.yml

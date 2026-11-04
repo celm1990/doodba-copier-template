@@ -32,8 +32,10 @@ services:
       PGHOST: {{ _key }}-db
     restart: unless-stopped
     depends_on:
+      {%- if postgres_version %}
       db:
         condition: service_healthy
+      {%- endif %}
       smtp:
         condition: service_started
     {%- if whitelisted_hosts %}
@@ -202,5 +204,7 @@ networks:
 
 volumes:
   filestore:
+  {% if postgres_version -%}
   db:
+  {%- endif %}
   smtpconf:
