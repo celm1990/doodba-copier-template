@@ -880,4 +880,6 @@ postgres_exposed_users:
 
     ⚠️ It must be a list.
 ---
+!include copier-custom.yml
+---
 !include copier-custom-postgres.yml
