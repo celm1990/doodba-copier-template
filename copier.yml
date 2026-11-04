@@ -883,3 +883,5 @@ postgres_exposed_users:
 !include copier-custom.yml
 ---
 !include copier-custom-postgres.yml
+---
+!include copier-custom-odoo.yml

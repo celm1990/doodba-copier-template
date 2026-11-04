@@ -1,0 +1,62 @@
+# Odoo configuration customizations on top of the upstream Doodba template.
+#
+# Included at the end of copier.yml. Overrides replace the whole upstream
+# question (keeping its position); new questions are asked after upstream ones.
+
+# Overrides of upstream questions
+odoo_initial_lang:
+  default: es_EC
+  type: str
+  help: >-
+    If you want to initialize Odoo automatically in a specific language, write it here.
+    The format must be ll_CC where ll is the language code and CC is the country code.
+
+    Examples: en_US, es_ES, es_VE...
+
+odoo_admin_password:
+  secret: true
+  default: odoo
+  type: str
+  help: >-
+    💡 To auto-generate strong passwords, see https://ddg.gg/?q=password+64+strong
+
+    ⚠️ This password is critical for security, especially if you set odoo_listdb to
+    true, so keep it safe.
+
+    What will be your odoo admin password?
+
+# New questions
+odoo_db_name:
+  type: str
+  default: "{{ postgres_dbname }}"
+  help: Nombre de BD de Odoo(dbname), pueden ser varias separadas por coma
+
+max_cron_threads:
+  default: 2
+  type: int
+  help: Cantidad de Crons disponibles?
+
+workers:
+  default: 4
+  type: int
+  help: Cantidad de Workers disponibles?
+
+limit_memory_hard:
+  default: 2684354560
+  type: int
+  help: Cantidad de Memoria RAM Disponible en Bytes(HARD)?
+
+limit_memory_soft:
+  default: 2147483648
+  type: int
+  help: Cantidad de Memoria RAM Disponible en Bytes(SOFT)?
+
+odoo_db_maxconn:
+  default: 100
+  type: int
+  help: Conexines Maximas a la  Base de datos desde Odoo?
+
+server_wide_modules:
+  default: base,web
+  type: str
+  help: Modulos a cargar al iniciar el server?

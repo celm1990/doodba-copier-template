@@ -23,6 +23,13 @@ services:
       PGDATABASE: &dbname {{ postgres_dbname }}
       PGUSER: &dbuser "{{ postgres_username }}"
       PROXY_MODE: "{% if odoo_proxy %}true{% else %}false{% endif %}"
+      DB_NAME: "${DB_NAME-{{ odoo_db_name }}}"
+      DB_MAXCONN: "${DB_MAXCONN-{{ odoo_db_maxconn }}}"
+      WORKERS: "${WORKERS-{{ workers }}}"
+      MAX_CRON_THREADS: "${MAX_CRON_THREADS-{{ max_cron_threads }}}"
+      LIMIT_MEMORY_HARD: "${LIMIT_MEMORY_HARD-{{ limit_memory_hard }}}"
+      LIMIT_MEMORY_SOFT: "${LIMIT_MEMORY_SOFT-{{ limit_memory_soft }}}"
+      SERVER_WIDE_MODULES: "${SERVER_WIDE_MODULES-{{ server_wide_modules }}}"
       GITHUB_TOKEN: "${DOODBA_GITHUB_TOKEN:-}"
     tty: true
     volumes:

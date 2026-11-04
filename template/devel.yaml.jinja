@@ -41,6 +41,8 @@ services:
       LIST_DB: "true"
       DEBUGPY_ENABLE: "${DOODBA_DEBUGPY_ENABLE:-0}"
       PGDATABASE: &dbname devel
+      DB_FILTER: *dbname
+      DB_NAME: *dbname
       PYDEVD_RESOLVE_SYMLINKS: 1
       PYTHONDONTWRITEBYTECODE: 1
       PYTHONOPTIMIZE: ""
@@ -77,6 +79,7 @@ services:
       {%- endif %}
       - --limit-time-real=9999999
       - --workers=0
+      - --max-cron-threads=0
       {%- if odoo_version == 9 %}
       - --dev
       {%- elif odoo_version >= 10 and odoo_version < 19 %}
@@ -95,6 +98,7 @@ services:
       UID: "${DOODBA_GITAGGREGATE_UID:-1000}"
       GID: "${DOODBA_GITAGGREGATE_GID:-1000}"
       UMASK: "$DOODBA_UMASK"
+      GITHUB_TOKEN: "${DOODBA_GITHUB_TOKEN:-}"
     depends_on: !override []
     user: root
     volumes: !override
