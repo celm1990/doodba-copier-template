@@ -266,6 +266,8 @@
       traefik.tcp.routers.{{ key }}-database.tls.passthrough: "true"
       {%- else %}
       traefik.tcp.routers.{{ key }}-database.tls.certResolver: letsencrypt
+      {#- libpq >= 17 sends ALPN "postgresql"; TLS options come from Traefik's file provider #}
+      traefik.tcp.routers.{{ key }}-database.tls.options: postgres@file
       {%- endif %}
 
       {%- if cidr_whitelist %}
