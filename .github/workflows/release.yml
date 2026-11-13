@@ -1,0 +1,57 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version part to bump
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: minor
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref_name == 'custom'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compute next tag
+        id: tag
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          last="$(git tag -l --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)"
+          if [ -z "$last" ]; then
+            echo "::error::No previous vX.Y.Z tag found"
+            exit 1
+          fi
+          if [ "$(git rev-list --count "$last..HEAD")" -eq 0 ]; then
+            echo "::error::No commits since $last"
+            exit 1
+          fi
+          IFS=. read -r major minor patch <<< "${last#v}"
+          case "$BUMP" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          echo "last=$last" >> "$GITHUB_OUTPUT"
+          echo "next=v$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${{ steps.tag.outputs.next }}" --target "$GITHUB_SHA"
+          --generate-notes --notes-start-tag "${{ steps.tag.outputs.last }}"

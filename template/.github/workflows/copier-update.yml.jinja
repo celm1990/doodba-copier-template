@@ -1,0 +1,82 @@
+name: copier-update
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: copier-update
+  cancel-in-progress: false
+
+jobs:
+  copier-update:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "{{ odoo_version }}"
+          token: {{ "${{ secrets.DOODBA_GITHUB_TOKEN }}" }}
+      - uses: actions/setup-python@v5
+{%- if odoo_version < 11 %}
+        with:
+          python-version: "2.7"
+{%- elif odoo_version < 14 %}
+        with:
+          python-version: "3.8"
+{%- else %}
+        with:
+          python-version: "3.10"
+{%- endif %}
+      - name: Install tools
+        run: |
+          pipx install copier
+          pipx install invoke
+          pip install pre-commit
+      - name: Configure git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Update from template
+        id: update
+        run: |
+          copier update --trust --defaults --conflict rej
+          version="$(sed -n 's/^_commit: *//p' .copier-answers.yml)"
+          echo "title=[{{ odoo_version }}] Update copier template to $version" >> "$GITHUB_OUTPUT"
+      - name: Run pre-commit
+        id: precommit
+        run: |
+          review=true
+          for attempt in 1 2 3; do
+            git add -A
+            if pre-commit run -a; then
+              review=false
+              break
+            fi
+          done
+          git add -A
+          if [ -n "$(git ls-files --cached --others --exclude-standard '*.rej')" ]; then
+            review=true
+          fi
+          echo "review=$review" >> "$GITHUB_OUTPUT"
+          if [ "$review" = false ]; then
+            echo "automerge=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create pull request
+        id: pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: {{ "${{ secrets.DOODBA_GITHUB_TOKEN }}" }}
+          branch: copier-update/{{ odoo_version }}
+          base: "{{ odoo_version }}"
+          delete-branch: true
+          commit-message: {{ "${{ steps.update.outputs.title }}" }}
+          title: {{ "${{ steps.update.outputs.title }}" }}
+          labels: {{ "${{ steps.precommit.outputs.review == 'true' && 'help wanted' || '' }}" }}
+      - name: Enable auto-merge
+        if: >-
+          {{ "steps.pr.outputs.pull-request-operation == 'created' &&" }}
+          steps.precommit.outputs.automerge
+        env:
+          GH_TOKEN: {{ "${{ secrets.DOODBA_GITHUB_TOKEN }}" }}
+        run: gh pr merge --auto --squash "{{ "${{ steps.pr.outputs.pull-request-number }}" }}"
