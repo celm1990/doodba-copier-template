@@ -120,9 +120,7 @@ services:
         domains_prod,
         postgres_cidr_whitelist,
         _key,
-        postgres_exposed_port,
-        project_name,
-        passthrough=postgres_exposed_mtls,
+        postgres_exposed_authentication,
       ) }}
     {%- elif postgres_open_port %}
     ports:

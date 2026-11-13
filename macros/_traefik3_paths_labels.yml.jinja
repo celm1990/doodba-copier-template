@@ -257,15 +257,13 @@
       {%- endif %}
 {%- endmacro %}
 
-{%- macro database(domain_groups_list, cidr_whitelist, key, port, project_name, passthrough) %}
+{%- macro database(domain_groups_list, cidr_whitelist, key, authentication) %}
       {#- Service #}
       traefik.tcp.routers.{{ key }}-database.entrypoints: postgres
       traefik.tcp.services.{{ key }}-database.loadbalancer.server.port: 5432
+      {%- if authentication == "certificate" %}
       traefik.tcp.routers.{{ key }}-database.tls: "true"
-      {%- if passthrough %}
       traefik.tcp.routers.{{ key }}-database.tls.passthrough: "true"
-      {%- else %}
-      traefik.tcp.routers.{{ key }}-database.tls.certResolver: letsencrypt
       {%- endif %}
 
       {%- if cidr_whitelist %}
@@ -280,7 +278,12 @@
       {%- for domain_group in domain_groups_list %}
         {%- set ns_hosts.all_hosts = ns_hosts.all_hosts + domain_group.hosts %}
       {%- endfor %}
+      {%- if authentication == "certificate" %}
       traefik.tcp.routers.{{ key }}-database.rule: {{ domains_rule_sni(ns_hosts.all_hosts) }}
+      {%- else %}
+      traefik.tcp.routers.{{ key }}-database.rule: HostSNI(`*`)
+      {%- endif %}
+
       {%- set _ns = namespace(basic_middlewares=[]) -%}
       {%- if cidr_whitelist %}
         {%- set _ns.basic_middlewares = _ns.basic_middlewares + ["db-allowlist"] %}

@@ -70,20 +70,26 @@ postgres_exposed_databases:
 
     ⚠️ It must be a list.
 
-# Same as upstream, but defaults to user/password auth (Traefik terminates TLS)
-postgres_exposed_enable_password:
-  default: true
-  type: bool
+# Overrides of upstream exposure questions.
+postgres_exposed_authentication:
+  type: str
+  default: password
+  choices:
+    Password over plain TCP: password
+    Client certificates with TLS passthrough: certificate
   when: "{{ postgres_exposed }}"
   help: >-
-    Allow access via password to exposed postgres db
+    How should remote users authenticate to the exposed PostgreSQL database?
+
+postgres_exposed_enable_password:
+  default: "{{ postgres_exposed_authentication == 'password' }}"
+  type: bool
+  when: "{{ false }}"
 
 postgres_exposed_mtls:
-  default: false
+  default: "{{ postgres_exposed_authentication == 'certificate' }}"
   type: bool
-  help: >-
-    Enables TLS passthrough to the exposed postgres container, it must then handle the
-    tls certs itself, and the ssl cert for traefik is ignored.
+  when: "{{ false }}"
 
 # New questions
 pg_tune_conf:

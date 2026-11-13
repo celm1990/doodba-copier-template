@@ -73,8 +73,7 @@ def test_postgresql_exposed(
     supported_odoo_version: float,
     single_project_path: Path,
 ):
-    """Assert that traefik labels are properly generated when exposing postgres."""
-    # TODO: Actually test connection to postgresql through traefik
+    """Render PostgreSQL exposure for password and certificate authentication."""
     if TRAEFIK_VERSION != "3":
         pytest.skip("Exposing postgres only supported on traefik v3")
     project_name = "dct-testing-odoo"
@@ -84,8 +83,7 @@ def test_postgresql_exposed(
         data={
             "odoo_version": supported_odoo_version,
             "postgres_exposed": True,
-            "postgres_exposed_enable_password": False,
-            "postgres_exposed_mtls": True,
+            "postgres_exposed_authentication": "password",
             "project_name": "dct-testing-odoo",
             "traefik_version": 3,
         },
@@ -99,17 +97,20 @@ def test_postgresql_exposed(
     # Custom: postgres_exposed_databases defaults to [postgres_dbname] (project_name)
     assert db_container.environment["WAN_DATABASES"] == f'["{project_name}"]'
     assert db_container.environment["WAN_USERS"] == '["readonly_user"]'
-    assert "WAN_AUTH_METHOD" not in db_container.environment
+    assert db_container.environment["WAN_AUTH_METHOD"] == "scram-sha-256"
     traefik_router = f"traefik.tcp.routers.{project_name}-{str(supported_odoo_version).replace('.', '-')}-prod-database"  # noqa: E501
-    assert db_container.labels[traefik_router + ".tls.passthrough"]
+    assert db_container.labels[traefik_router + ".rule"] == "HostSNI(`*`)"
+    assert traefik_router + ".tls" not in db_container.labels
+    assert traefik_router + ".tls.passthrough" not in db_container.labels
+    assert traefik_router + ".tls.certResolver" not in db_container.labels
+
     run_copy(
         str(cloned_template),
         str(single_project_path),
         data={
             "odoo_version": supported_odoo_version,
             "postgres_exposed": True,
-            "postgres_exposed_enable_password": True,
-            "postgres_exposed_mtls": False,
+            "postgres_exposed_authentication": "certificate",
             "project_name": "dct-testing-odoo",
             "traefik_version": 3,
         },
@@ -120,5 +121,5 @@ def test_postgresql_exposed(
     )
     test_config = DockerClient(compose_files=["prod.yaml"]).compose.config()
     db_container = test_config.services["db"]
-    assert "WAN_AUTH_METHOD" in db_container.environment
-    assert db_container.labels[traefik_router + ".tls.certResolver"]
+    assert "WAN_AUTH_METHOD" not in db_container.environment
+    assert db_container.labels[traefik_router + ".tls.passthrough"] == "true"
