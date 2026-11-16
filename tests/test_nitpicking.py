@@ -297,7 +297,7 @@ def test_code_workspace_file(
 
 
 def test_dotdocker_ignore_content(single_project_path: Path, cloned_template: Path):
-    """Custom: .docker is versioned, so its content must not be ignored."""
+    """Everything inside .docker must be ignored."""
     run_copy(
         str(cloned_template),
         str(single_project_path),
@@ -310,7 +310,7 @@ def test_dotdocker_ignore_content(single_project_path: Path, cloned_template: Pa
     local["pre-commit"]("run", "--all-files", "--show-diff-on-failure", retcode=1)
     git("commit", "-am", "Hello World")
     (single_project_path / ".docker" / "some-file").touch()
-    assert git("status", "--porcelain") == "?? .docker/some-file\n"
+    assert not git("status", "--porcelain")
 
 
 def test_template_update_badge(single_project_path: Path, cloned_template: Path):

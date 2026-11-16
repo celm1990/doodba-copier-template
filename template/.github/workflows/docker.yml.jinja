@@ -87,6 +87,16 @@ jobs:
             /usr/local/share/powershell /usr/local/julia* /opt/az /opt/microsoft"
           testing: false
 {%- endif %}
+      - name: Create generic .docker env files
+        # .docker is ignored by git. These are runtime-only env files, so
+        # placeholder values are enough for CI and never reach the image.
+        run: |
+          mkdir -p .docker
+          echo "ADMIN_PASSWORD=admin" > .docker/odoo.env
+          echo "PGPASSWORD=odoo" > .docker/db-access.env
+          echo "POSTGRES_PASSWORD=odoo" > .docker/db-creation.env
+          echo "RELAY_PASSWORD=" > .docker/smtp.env
+          echo "PASSPHRASE=ci" > .docker/backup.env
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to Docker Register
