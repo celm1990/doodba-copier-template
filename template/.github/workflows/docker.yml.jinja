@@ -110,7 +110,7 @@ jobs:
         env:
           DOODBA_GITHUB_TOKEN: {{ "${{ secrets.DOODBA_GITHUB_TOKEN }}" }}
         run: |
-          docker compose --file ./inverseproxy/traefik.yaml --project-name inverseproxy up -d --remove-orphans
+          docker network create inverseproxy_shared
           docker compose --project-name odoo up -d --build --remove-orphans
           docker compose --project-name odoo down
       - name: Verificar Addons en Private
