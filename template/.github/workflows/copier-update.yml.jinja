@@ -42,6 +42,11 @@ jobs:
         id: update
         run: |
           copier update --trust --defaults --conflict rej
+          # A conflict on a file the template removed leaves only its .rej
+          # behind; there is nothing left to review, so drop it
+          find . -name '*.rej' -not -path './.git/*' | while read -r rej; do
+            [ -e "${rej%.rej}" ] || rm -f "$rej"
+          done
           version="$(sed -n 's/^_commit: *//p' .copier-answers.yml)"
           echo "title=[{{ odoo_version }}] Update copier template to $version" >> "$GITHUB_OUTPUT"
       - name: Run pre-commit
@@ -63,6 +68,9 @@ jobs:
           if [ "$review" = false ]; then
             echo "automerge=true" >> "$GITHUB_OUTPUT"
           fi
+          # The PR action commits on its own; the hook would reject the .rej
+          # files and block the very PR meant to review them
+          pre-commit uninstall
       - name: Create pull request
         id: pr
         uses: peter-evans/create-pull-request@v7
