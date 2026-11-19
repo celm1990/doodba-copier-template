@@ -1,0 +1,92 @@
+# Deploy this project to its servers by running the Ansible playbook of the
+# infrastructure repository. The project is looked up in the infrastructure
+# inventory by this repository's name.
+#
+# Requirements (organization or repository level):
+#   secrets.DOODBA_GITHUB_TOKEN: read access to the infrastructure repository
+#   secrets.SSH_PRIVATE_KEY: SSH key used by Ansible to reach the servers
+#   vars.GCP_WORKLOAD_IDENTITY_PROVIDER, vars.GCP_SERVICE_ACCOUNT: GCP access
+#     (secrets and SSH through IAP); the Workload Identity provider must
+#     accept this repository
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Doodba environment
+        type: choice
+        options: [prod, test]
+        default: prod
+      autoupdate:
+        description: Update Odoo modules (click-odoo-update)
+        type: boolean
+        default: true
+      check:
+        description: Dry run (ansible --check --diff), nothing is changed
+        type: boolean
+        default: false
+
+env:
+  INFRA_REPOSITORY: celm1990/spearhead-infrastructure
+  # Inventory projects are named after their repository
+  PROJECT: ${{ github.event.repository.name }}
+  DEPLOY_ENV: ${{ inputs.env }}
+  AUTOUPDATE: ${{ inputs.autoupdate }}
+  CHECK: ${{ inputs.check }}
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ github.event.repository.name }}-${{ inputs.env }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    # Configure required reviewers in the `production` environment
+    environment: ${{ inputs.env == 'prod' && 'production' || 'test' }}
+    timeout-minutes: 60
+    steps:
+      - name: Validate inputs
+        run: |
+          [[ "$PROJECT" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo "Invalid project: $PROJECT"; exit 1; }
+          [[ "$DEPLOY_ENV" =~ ^(prod|test)$ ]] || { echo "Invalid env: $DEPLOY_ENV"; exit 1; }
+          [[ "$AUTOUPDATE" =~ ^(true|false)$ ]] || { echo "Invalid autoupdate: $AUTOUPDATE"; exit 1; }
+          [[ "$CHECK" =~ ^(true|false)$ ]] || { echo "Invalid check: $CHECK"; exit 1; }
+      - name: Check deploy permission
+        env:
+          # Needs read:org (classic) or Members: read (fine-grained)
+          GH_TOKEN: ${{ secrets.DOODBA_GITHUB_TOKEN }}
+          # Who launched or re-ran the workflow
+          ACTOR: ${{ github.triggering_actor }}
+          DEPLOY_TEAM: odoo-deployers
+        run: |
+          state=$(gh api "orgs/$GITHUB_REPOSITORY_OWNER/teams/$DEPLOY_TEAM/memberships/$ACTOR" \
+            --jq .state 2>/dev/null || true)
+          [ "$state" = active ] || {
+            echo "::error::$ACTOR is not an active member of team $DEPLOY_TEAM, required to deploy"
+            exit 1
+          }
+      # Checked out at the workspace root: its setup action and ansible.cfg
+      # expect to run from there
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.INFRA_REPOSITORY }}
+          token: ${{ secrets.DOODBA_GITHUB_TOKEN }}
+      - uses: ./.github/actions/setup
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          gcp-workload-identity-provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          gcp-service-account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - name: Deploy
+        run: |
+          inventory=inventories/production.yaml
+          [ "$DEPLOY_ENV" = test ] && inventory=inventories/test.yaml
+          check_args=()
+          [ "$CHECK" = true ] && check_args=(--check --diff)
+          ansible-playbook "${check_args[@]}" -i "$inventory" playbooks/deploy-odoo.yaml \
+            -e deploy_project="${PROJECT//./\\.}" -e deploy_env="$DEPLOY_ENV" \
+            -e odoo_autoupdate="$AUTOUPDATE"
