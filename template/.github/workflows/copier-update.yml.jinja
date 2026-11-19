@@ -38,17 +38,37 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      - name: Update from template
+          # Private templates (e.g. the AI framework) are cloned by copier
+          # outside this checkout, so they need the token too
+          git config --global \
+            url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf \
+            "https://github.com/"
+        env:
+          GH_TOKEN: {{ "${{ secrets.DOODBA_GITHUB_TOKEN }}" }}
+      - name: Update from templates
         id: update
         run: |
-          copier update --trust --defaults --conflict rej
-          # A conflict on a file the template removed leaves only its .rej
-          # behind; there is nothing left to review, so drop it
-          find . -name '*.rej' -not -path './.git/*' | while read -r rej; do
-            [ -e "${rej%.rej}" ] || rm -f "$rej"
+          title="[{{ odoo_version }}] Update copier template to"
+          # Each answers file is a different template; copier refuses to
+          # update a dirty tree, so commit after each one
+          for answers in .copier-answers.yml .ai-framework.yml; do
+            [ -f "$answers" ] || continue
+            copier update --trust --defaults --conflict rej -a "$answers"
+            # A conflict on a file the template removed leaves only its .rej
+            # behind; there is nothing left to review, so drop it
+            find . -name '*.rej' -not -path './.git/*' | while read -r rej; do
+              [ -e "${rej%.rej}" ] || rm -f "$rej"
+            done
+            version="$(sed -n 's/^_commit: *//p' "$answers")"
+            case "$answers" in
+              .ai-framework.yml) title="$title, AI framework $version" ;;
+              *) title="$title $version" ;;
+            esac
+            git add -A
+            git diff --cached --quiet ||
+              git commit --no-verify -qm "Update from $answers to $version"
           done
-          version="$(sed -n 's/^_commit: *//p' .copier-answers.yml)"
-          echo "title=[{{ odoo_version }}] Update copier template to $version" >> "$GITHUB_OUTPUT"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
       - name: Run pre-commit
         id: precommit
         run: |
