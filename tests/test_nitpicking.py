@@ -271,12 +271,12 @@ def test_code_workspace_file(
         workspace_definition = json.load(fp)
     # Check workspace folder definition and order
     assert workspace_definition["folders"] == [
+        {"name": f"doodba.{single_project_path.name}", "path": "."},
         {"path": "odoo/custom/src/aaa"},
         {"path": "odoo/custom/src/bbb"},
         {"path": "odoo/custom/src/zzz"},
         {"path": "odoo/custom/src/odoo"},
         {"path": "odoo/custom/src/private"},
-        {"name": f"doodba.{single_project_path.name}", "path": "."},
     ]
     # Firefox debugger configuration
     url = f"http://localhost:{supported_odoo_version:.0f}069/test_module_static/static/"

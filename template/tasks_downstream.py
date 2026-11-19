@@ -447,7 +447,7 @@ def write_code_workspace_file(c, cw_path=None):
     }
     # Sort project folders
     cw_config["folders"].sort(key=operator.itemgetter("path"))
-    # Put Odoo folder just before private and top folder and map to debugpy
+    # Put Odoo folder just before private and map to debugpy
     odoo = SRC_PATH / "odoo"
     if odoo.is_dir():
         cw_config["folders"].append({"path": str(odoo.relative_to(PROJECT_ROOT))})
@@ -455,8 +455,9 @@ def write_code_workspace_file(c, cw_path=None):
     private = SRC_PATH / "private"
     if private.is_dir():
         cw_config["folders"].append({"path": str(private.relative_to(PROJECT_ROOT))})
-    # HACK https://github.com/microsoft/vscode/issues/37947 put top folder last
-    cw_config["folders"].append({"path": ".", "name": root_name})
+    # Put top folder first so tools that use the first workspace folder as
+    # their working directory (AI assistants, new terminals) start at the root
+    cw_config["folders"].insert(0, {"path": ".", "name": root_name})
     with open(cw_path, "w") as cw_fd:
         json.dump(cw_config, cw_fd, indent=2)
         cw_fd.write("\n")
