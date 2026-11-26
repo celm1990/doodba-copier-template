@@ -124,7 +124,7 @@ services:
         project_name,
         passthrough=postgres_exposed_tls_passthrough,
       ) }}
-    {%- elif postgres_open_port %}
+    {%- else %}
     ports:
       - "{{ postgres_exposed_port }}:5432"
     {%- endif %}

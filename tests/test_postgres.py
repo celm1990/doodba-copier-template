@@ -122,3 +122,27 @@ def test_postgresql_exposed(
     db_container = test_config.services["db"]
     assert "WAN_AUTH_METHOD" in db_container.environment
     assert db_container.labels[traefik_router + ".tls.certResolver"]
+    assert db_container.labels[traefik_router + ".tls.options"] == "postgres@file"
+    assert not db_container.ports
+
+    # Custom: exposing postgres directly opens the port in prod without Traefik
+    run_copy(
+        str(cloned_template),
+        str(single_project_path),
+        data={
+            "odoo_version": supported_odoo_version,
+            "postgres_exposed": True,
+            "postgres_exposed_behind_traefik": False,
+            "postgres_exposed_port": 5434,
+            "project_name": "dct-testing-odoo",
+            "traefik_version": 3,
+        },
+        vcs_ref="HEAD",
+        defaults=True,
+        overwrite=True,
+        unsafe=True,
+    )
+    test_config = DockerClient(compose_files=["prod.yaml"]).compose.config()
+    db_container = test_config.services["db"]
+    assert [(p.published, p.target) for p in db_container.ports] == [(5434, 5432)]
+    assert not db_container.labels
