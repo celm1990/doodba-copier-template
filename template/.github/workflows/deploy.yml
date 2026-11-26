@@ -16,7 +16,7 @@ on:
       env:
         description: Doodba environment
         type: choice
-        options: [prod, test]
+        options: [prod, test, migration]
         default: prod
       autoupdate:
         description: Update Odoo modules (click-odoo-update)
@@ -53,7 +53,7 @@ jobs:
       - name: Validate inputs
         run: |
           [[ "$PROJECT" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo "Invalid project: $PROJECT"; exit 1; }
-          [[ "$DEPLOY_ENV" =~ ^(prod|test)$ ]] || { echo "Invalid env: $DEPLOY_ENV"; exit 1; }
+          [[ "$DEPLOY_ENV" =~ ^(prod|test|migration)$ ]] || { echo "Invalid env: $DEPLOY_ENV"; exit 1; }
           [[ "$AUTOUPDATE" =~ ^(true|false)$ ]] || { echo "Invalid autoupdate: $AUTOUPDATE"; exit 1; }
           [[ "$CHECK" =~ ^(true|false)$ ]] || { echo "Invalid check: $CHECK"; exit 1; }
       - name: Check deploy permission
@@ -84,7 +84,8 @@ jobs:
       - name: Deploy
         run: |
           inventory=inventories/production.yaml
-          [ "$DEPLOY_ENV" = test ] && inventory=inventories/test.yaml
+          # Test and migration projects are in the test inventory
+          [ "$DEPLOY_ENV" != prod ] && inventory=inventories/test.yaml
           check_args=()
           [ "$CHECK" = true ] && check_args=(--check --diff)
           ansible-playbook "${check_args[@]}" -i "$inventory" playbooks/deploy-odoo.yaml \

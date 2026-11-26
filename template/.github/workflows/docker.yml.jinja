@@ -9,6 +9,7 @@ on:
     branches:
       - "{{odoo_version}}"
       - "{{odoo_version}}-test*"
+      - "{{odoo_version}}-migration*"
 
 concurrency:
   group: ci-{{ "${{ github.ref }}" }}

@@ -490,3 +490,24 @@ def test_no_python_write_bytecode_in_devel(
     )
     devel = yaml.safe_load((single_project_path / "devel.yaml").read_text())
     assert devel["services"]["odoo"]["environment"]["PYTHONDONTWRITEBYTECODE"] == 1
+
+
+def test_migration_env_workflows(cloned_template: Path, tmp_path: Path):
+    """The migration env can be built and deployed from its own branch."""
+    run_copy(
+        str(cloned_template),
+        str(tmp_path),
+        vcs_ref="test",
+        defaults=True,
+        overwrite=True,
+        unsafe=True,
+    )
+    workflows = tmp_path / ".github" / "workflows"
+    docker = yaml.safe_load((workflows / "docker.yml").read_text())
+    assert f"{DEFAULT_ODOO_VERSION}-migration*" in docker[True]["push"]["branches"]
+    deploy_text = (workflows / "deploy.yml").read_text()
+    deploy = yaml.safe_load(deploy_text)
+    env_input = deploy[True]["workflow_dispatch"]["inputs"]["env"]
+    assert env_input["options"] == ["prod", "test", "migration"]
+    assert "^(prod|test|migration)$" in deploy_text
+    assert '[ "$DEPLOY_ENV" != prod ] && inventory=inventories/test.yaml' in deploy_text
